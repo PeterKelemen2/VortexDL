@@ -13,6 +13,7 @@ class UserRegister(UserLogin):
 
 class UserRead(UserBase):
     id: int
+    email: str | None
     role: str
     created_at: datetime
     updated_at: datetime

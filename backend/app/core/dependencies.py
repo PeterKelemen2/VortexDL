@@ -6,6 +6,7 @@ from app.models.user import User
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -22,7 +23,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    stmt = select(User).where(User.id == int(user_id))
+    stmt = select(User).where(User.id == int(user_id)).options(selectinload(User.role))
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:

@@ -2,24 +2,31 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../utils/api'
+import { useAuthStore } from '@/stores/auth'
 import { Eye, EyeOff } from 'lucide-vue-next'
 
 const router = useRouter()
+const auth = useAuthStore()
 const form = ref({ username: '', email: '', password: '', password_confirm: '' })
 const loading = ref(false)
 const error = ref('')
+const success = ref('')
 const showPassword = ref(false)
 const showPasswordConf = ref(false)
 
 async function onRegister() {
   loading.value = true
   error.value = ''
+  success.value = ''
   try {
     if (form.value.password !== form.value.password_confirm) {
       throw new Error('Passwords do not match')
     }
     await api.register(form.value)
-    await router.push('/login')
+    await auth.login(form.value.username, form.value.password)
+    success.value = 'Registration successful! Redirecting...'
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    await router.push('/')
   } catch (e) {
     error.value = e.message
   } finally {
@@ -103,6 +110,7 @@ async function onRegister() {
         >
           {{ loading ? 'Registering...' : 'Register' }}
         </button>
+        <div v-if="success" class="text-green-600 text-center font-medium">{{ success }}</div>
         <div v-if="error" class="text-red-600 text-center font-medium">{{ error }}</div>
         <div class="text-center mt-2">
           <router-link to="/login" class="text-blue-600 hover:underline"

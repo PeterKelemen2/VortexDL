@@ -1,22 +1,25 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { api } from '../utils/api'
+import { useAuthStore } from '@/stores/auth'
 import { Eye, EyeOff } from 'lucide-vue-next'
 
 const router = useRouter()
+const auth = useAuthStore()
 const form = ref({ username: '', password: '' })
 const loading = ref(false)
 const error = ref('')
+const success = ref('')
 const showPassword = ref(false)
 
 async function onLogin() {
   loading.value = true
   error.value = ''
+  success.value = ''
   try {
-    const data = await api.login(form.value)
-    localStorage.setItem('access_token', data.access_token)
-    localStorage.setItem('refresh_token', data.refresh_token)
+    await auth.login(form.value.username, form.value.password)
+    success.value = 'Login successful! Redirecting...'
+    await new Promise((resolve) => setTimeout(resolve, 400))
     await router.push('/')
   } catch (e) {
     error.value = e.message
@@ -70,6 +73,7 @@ async function onLogin() {
         >
           {{ loading ? 'Logging in...' : 'Login' }}
         </button>
+        <div v-if="success" class="text-green-600 text-center font-medium">{{ success }}</div>
         <div v-if="error" class="text-red-600 text-center font-medium">{{ error }}</div>
         <div class="text-center mt-2">
           <router-link to="/register" class="text-blue-600 hover:underline"
