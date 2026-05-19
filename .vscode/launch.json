@@ -1,0 +1,39 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FastAPI (uvicorn)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "app.main:app",
+        "--reload",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "cwd": "${workspaceFolder}/backend",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend"
+      },
+      "justMyCode": true
+    },
+    {
+      "name": "Frontend (npm run dev)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    }
+  ]
+}
