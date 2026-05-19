@@ -19,7 +19,7 @@ async function onLogin() {
   try {
     await auth.login(form.value.username, form.value.password)
     success.value = 'Login successful! Redirecting...'
-    await new Promise((resolve) => setTimeout(resolve, 400))
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     await router.push('/')
   } catch (e) {
     error.value = e.message

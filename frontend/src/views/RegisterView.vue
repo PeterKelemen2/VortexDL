@@ -25,7 +25,7 @@ async function onRegister() {
     await api.register(form.value)
     await auth.login(form.value.username, form.value.password)
     success.value = 'Registration successful! Redirecting...'
-    await new Promise((resolve) => setTimeout(resolve, 400))
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     await router.push('/')
   } catch (e) {
     error.value = e.message
