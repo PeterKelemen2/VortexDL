@@ -1,19 +1,24 @@
-from datetime import timedelta, datetime
-from jose import jwt, JWTError
-from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
-from app.core.config import settings
+from fastapi import HTTPException
+from app.schemas.user import UserRead, UserCreate
+from app.schemas.auth import TokenResponse, TokenRefreshRequest
+from app.models.role import Role
 from app.models.user import User
 from app.models.refresh_token import RefreshToken
+from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
+from app.core.config import settings
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from datetime import timedelta, datetime
 import hashlib
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 14
 
+
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+
 
 async def authenticate_user(session: AsyncSession, username: str, password: str):
     stmt = select(User).where(User.username == username).options(selectinload(User.role))
@@ -22,6 +27,7 @@ async def authenticate_user(session: AsyncSession, username: str, password: str)
     if user and verify_password(password, user.hashed_password):
         return user
     return None
+
 
 async def create_tokens(session: AsyncSession, user: User):
     access_token = create_access_token(
@@ -41,7 +47,108 @@ async def create_tokens(session: AsyncSession, user: User):
     await session.commit()
     return access_token, raw_refresh
 
+
 async def rotate_refresh_token(session: AsyncSession, user: User, old_token: RefreshToken):
     old_token.revoked = True
     await session.commit()
     return await create_tokens(session, user)
+
+
+async def register_user(user_in: UserCreate, db: AsyncSession):
+    # Check if user exists
+    stmt = select(User).where(User.username == user_in.username)
+    result = await db.execute(stmt)
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Username already registered")
+
+    # Assign default role
+    role_stmt = select(Role).where(Role.name == "user")
+    role_result = await db.execute(role_stmt)
+    role = role_result.scalar_one_or_none()
+    if not role:
+        role = Role(name="user", description="Default user role")
+        db.add(role)
+        await db.commit()
+        await db.refresh(role)
+
+    hashed_pw = hash_password(user_in.password)
+    user = User(
+        username=user_in.username,
+        email=user_in.email,
+        hashed_password=hashed_pw,
+        role_id=role.id,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    db.add(user)
+    await db.commit()
+    # FIX: refresh user so that user.id and other DB-generated fields are populated
+    await db.refresh(user)
+
+    return UserRead(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        role=role.name,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+    )
+
+
+async def refresh_tokens(data, db: AsyncSession):
+    if isinstance(data, UserCreate):
+        user = await authenticate_user(db, data.username, data.password)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        access_token, refresh_token = await create_tokens(db, user)
+        return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    elif isinstance(data, TokenRefreshRequest):
+        token_hash_val = hash_token(data.refresh_token)
+        stmt = select(RefreshToken).where(
+            RefreshToken.token_hash == token_hash_val,
+            RefreshToken.revoked == False
+        )
+        result = await db.execute(stmt)
+        db_token = result.scalar_one_or_none()
+        if not db_token or db_token.expires_at < datetime.utcnow():
+            raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+        # FIX: load user with role eagerly to avoid lazy-load issues
+        user_stmt = select(User).where(User.id == db_token.user_id).options(selectinload(User.role))
+        user_result = await db.execute(user_stmt)
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+
+        db_token.last_used_at = datetime.utcnow()
+        await db.commit()
+        access_token, new_refresh = await rotate_refresh_token(db, user, db_token)
+        return TokenResponse(access_token=access_token, refresh_token=new_refresh)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid request")
+
+
+async def logout_refresh_token(token_req: TokenRefreshRequest, db: AsyncSession):
+    token_hash_val = hash_token(token_req.refresh_token)
+    stmt = select(RefreshToken).where(
+        RefreshToken.token_hash == token_hash_val,
+        RefreshToken.revoked == False
+    )
+    result = await db.execute(stmt)
+    db_token = result.scalar_one_or_none()
+    if db_token:
+        db_token.revoked = True
+        await db.commit()
+    return {"msg": "Logged out"}
+
+
+def get_user_info(current_user: User):
+    # NOTE: caller must ensure current_user.role is eagerly loaded
+    return UserRead(
+        id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        role=current_user.role.name,
+        created_at=current_user.created_at,
+        updated_at=current_user.updated_at,
+    )

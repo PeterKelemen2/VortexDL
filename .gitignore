@@ -2,6 +2,7 @@
 *.env.*
 .venv
 __pycache__
+*.db
 
 # Python cache and test artifacts
 *.pyc
