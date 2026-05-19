@@ -21,8 +21,8 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-async def authenticate_user(session: AsyncSession, email: str, password: str):
-    stmt = select(User).where(User.email == email).options(selectinload(User.role))
+async def authenticate_user(session: AsyncSession, username: str, password: str):
+    stmt = select(User).where(User.username == username).options(selectinload(User.role))
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
     if user and verify_password(password, user.hashed_password):
@@ -111,7 +111,7 @@ async def register_user(user_in: UserRegister, db: AsyncSession):
 
 async def refresh_tokens(data, db: AsyncSession):
     if isinstance(data, UserLogin):
-        user = await authenticate_user(db, data.email, data.password)
+        user = await authenticate_user(db, data.username, data.password)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
         access_token, refresh_token = await create_tokens(db, user)
