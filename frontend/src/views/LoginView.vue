@@ -33,23 +33,17 @@ async function onLogin() {
   <div
     class="flex min-h-screen items-center justify-center bg-linear-to-br from-blue-100 to-blue-300"
   >
-    <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
-      <h2 class="text-2xl font-bold mb-6 text-center text-blue-700">Login</h2>
+    <div class="card bg-primary-light">
+      <h2>Login</h2>
       <form @submit.prevent="onLogin" class="space-y-5">
         <div>
-          <label class="block text-gray-700 mb-1 font-medium">Username</label>
-          <input
-            class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none bg-gray-50"
-            v-model="form.username"
-            required
-            autocomplete="username"
-          />
+          <label>Username</label>
+          <input v-model="form.username" required autocomplete="username" />
         </div>
         <div>
-          <label class="block text-gray-700 mb-1 font-medium">Password</label>
+          <label>Password</label>
           <div class="relative">
             <input
-              class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none bg-gray-50 pr-10"
               v-model="form.password"
               :type="showPassword ? 'text' : 'password'"
               required
@@ -66,11 +60,7 @@ async function onLogin() {
             </button>
           </div>
         </div>
-        <button
-          type="submit"
-          :disabled="loading"
-          class="w-full py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-60"
-        >
+        <button type="submit" :disabled="loading" class="btn w-full">
           {{ loading ? 'Logging in...' : 'Login' }}
         </button>
         <div v-if="success" class="text-green-600 text-center font-medium">{{ success }}</div>

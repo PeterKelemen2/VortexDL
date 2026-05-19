@@ -1,1 +1,69 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+:root {
+  --color-primary: #3b82f6;
+  --color-primary-light: #d3e1ff;
+  --color-primary-dark: #1e40af;
+  --color-secondary: #64748b;
+  --color-accent: #f59e42;
+  --color-bg: #f1f5f9;
+  --color-surface: #fff;
+  --color-error: #dc2626;
+  --color-success: #16a34a;
+  --color-warning: #facc15;
+}
+
+@theme {
+  --color-primary: #d3e1ff;
+  --color-primary-light: #3b82f6;
+  --color-primary-dark: #1e40af;
+  --color-secondary: #64748b;
+  --color-accent: #f59e42;
+  --color-bg: #f1f5f9;
+  --color-surface: #fff;
+  --color-error: #dc2626;
+  --color-success: #16a34a;
+  --color-warning: #facc15;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
+    @apply font-bold mb-4 text-center text-primary;
+  }
+
+  h1 {
+    @apply text-3xl;
+  }
+  h2 {
+    @apply text-2xl;
+  }
+  h3 {
+    @apply text-lg;
+  }
+  h4 {
+    @apply text-base;
+  }
+  h5 {
+    @apply text-sm;
+  }
+
+  label {
+    @apply block text-gray-700 mb-1 font-medium;
+  }
+
+  input {
+    @apply w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none bg-gray-50;
+  }
+
+  .card {
+    @apply w-full max-w-md rounded-xl shadow-lg p-8;
+  }
+
+  .btn {
+    @apply px-3 py-2 rounded-lg text-white bg-primary hover:bg-primary-dark focus:ring-2 focus:ring-primary-light focus:outline-none transition-colors disabled:opacity-60;
+  }
+}

@@ -39,32 +39,21 @@ async function onRegister() {
   <div
     class="flex min-h-screen items-center justify-center bg-linear-to-br from-blue-100 to-blue-300"
   >
-    <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
-      <h2 class="text-2xl font-bold mb-6 text-center text-blue-700">Register</h2>
+    <div class="card bg-primary-light">
+      <h2>Register</h2>
       <form @submit.prevent="onRegister" class="space-y-5">
         <div>
           <label class="block text-gray-700 mb-1 font-medium">Username</label>
-          <input
-            class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none bg-gray-50"
-            v-model="form.username"
-            required
-            autocomplete="username"
-          />
+          <input v-model="form.username" required autocomplete="username" />
         </div>
         <div>
           <label class="block text-gray-700 mb-1 font-medium">Email</label>
-          <input
-            class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none bg-gray-50"
-            v-model="form.email"
-            type="email"
-            autocomplete="email"
-          />
+          <input v-model="form.email" type="email" autocomplete="email" />
         </div>
         <div>
           <label class="block text-gray-700 mb-1 font-medium">Password</label>
           <div class="relative">
             <input
-              class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none bg-gray-50 pr-10"
               v-model="form.password"
               :type="showPassword ? 'text' : 'password'"
               required
@@ -85,7 +74,6 @@ async function onRegister() {
           <label class="block text-gray-700 mb-1 font-medium">Confirm Password</label>
           <div class="relative">
             <input
-              class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none bg-gray-50 pr-10"
               v-model="form.password_confirm"
               :type="showPasswordConf ? 'text' : 'password'"
               required
@@ -103,11 +91,7 @@ async function onRegister() {
           </div>
         </div>
 
-        <button
-          type="submit"
-          :disabled="loading"
-          class="w-full py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-60"
-        >
+        <button type="submit" :disabled="loading" class="btn w-full">
           {{ loading ? 'Registering...' : 'Register' }}
         </button>
         <div v-if="success" class="text-green-600 text-center font-medium">{{ success }}</div>
