@@ -5,8 +5,13 @@ class UserBase(BaseModel):
     username: str
     email: EmailStr | None = None
 
-class UserCreate(UserBase):
+class UserLogin(BaseModel):
+    email: EmailStr
     password: str
+
+class UserRegister(UserBase):
+    password: str
+    password_confirm: str
 
 class UserRead(UserBase):
     id: int

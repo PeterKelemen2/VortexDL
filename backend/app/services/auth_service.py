@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from app.schemas.user import UserRead, UserCreate
+from app.schemas.user import UserRead, UserRegister, UserLogin
 from app.schemas.auth import TokenResponse, TokenRefreshRequest
 from app.models.role import Role
 from app.models.user import User
@@ -8,6 +8,7 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.core.config import settings
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 from datetime import timedelta, datetime
 import hashlib
@@ -20,8 +21,8 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-async def authenticate_user(session: AsyncSession, username: str, password: str):
-    stmt = select(User).where(User.username == username).options(selectinload(User.role))
+async def authenticate_user(session: AsyncSession, email: str, password: str):
+    stmt = select(User).where(User.email == email).options(selectinload(User.role))
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
     if user and verify_password(password, user.hashed_password):
@@ -54,50 +55,63 @@ async def rotate_refresh_token(session: AsyncSession, user: User, old_token: Ref
     return await create_tokens(session, user)
 
 
-async def register_user(user_in: UserCreate, db: AsyncSession):
+async def register_user(user_in: UserRegister, db: AsyncSession):
     # Check if user exists
+    if user_in.password != user_in.password_confirm:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+    
     stmt = select(User).where(User.username == user_in.username)
     result = await db.execute(stmt)
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already registered")
 
-    # Assign default role
-    role_stmt = select(Role).where(Role.name == "user")
-    role_result = await db.execute(role_stmt)
-    role = role_result.scalar_one_or_none()
-    if not role:
-        role = Role(name="user", description="Default user role")
-        db.add(role)
-        await db.commit()
-        await db.refresh(role)
+    # Ensure roles exist
+    role_names = {"admin": "Administrator role", "user": "Default user role"}
+    existing_roles = {}
+    for role_name, desc in role_names.items():
+        role_stmt = select(Role).where(Role.name == role_name)
+        role_result = await db.execute(role_stmt)
+        role = role_result.scalar_one_or_none()
+        if not role:
+            role = Role(name=role_name, description=desc)
+            db.add(role)
+            await db.commit()
+            await db.refresh(role)
+        existing_roles[role_name] = role or await db.scalar(select(Role).where(Role.name == role_name))
+
+    # Determine if this is the first user
+    user_count = await db.scalar(select(sa.func.count()).select_from(User))
+    if user_count == 0:
+        assigned_role = existing_roles["admin"]
+    else:
+        assigned_role = existing_roles["user"]
 
     hashed_pw = hash_password(user_in.password)
     user = User(
         username=user_in.username,
         email=user_in.email,
         hashed_password=hashed_pw,
-        role_id=role.id,
+        role_id=assigned_role.id,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
     db.add(user)
     await db.commit()
-    # FIX: refresh user so that user.id and other DB-generated fields are populated
     await db.refresh(user)
 
     return UserRead(
         id=user.id,
         username=user.username,
         email=user.email,
-        role=role.name,
+        role=assigned_role.name,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )
 
 
 async def refresh_tokens(data, db: AsyncSession):
-    if isinstance(data, UserCreate):
-        user = await authenticate_user(db, data.username, data.password)
+    if isinstance(data, UserLogin):
+        user = await authenticate_user(db, data.email, data.password)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
         access_token, refresh_token = await create_tokens(db, user)

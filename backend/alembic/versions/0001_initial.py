@@ -1,5 +1,7 @@
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.sql import table, column
+from sqlalchemy import String
 
 """initial
 
@@ -44,6 +46,17 @@ def upgrade():
         sa.Column("created_at", sa.DateTime, nullable=False),
         sa.Column("last_used_at", sa.DateTime),
     )
+    # Seed roles
+    roles_table = table(
+        'roles',
+        column('name', String),
+        column('description', String)
+    )
+    conn = op.get_bind()
+    existing_roles = [row[0] for row in conn.execute(sa.text("SELECT name FROM roles")).fetchall()]
+    for name, desc in [("admin", "Administrator role"), ("user", "Default user role")]:
+        if name not in existing_roles:
+            op.execute(roles_table.insert().values(name=name, description=desc))
 
 def downgrade():
     op.drop_table("refresh_tokens")
