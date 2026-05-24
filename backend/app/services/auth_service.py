@@ -182,7 +182,14 @@ async def rotate_refresh_token(
 ):
     old_token.revoked = True
     await session.commit()
-    return await create_tokens(session, user, device_name=device_name, user_agent=user_agent)
+    return await create_tokens(
+        session,
+        user,
+        device_name=device_name,
+        resolved_name=old_token.resolved_name,
+        device_os=old_token.device_os,
+        user_agent=user_agent,
+    )
 
 
 async def register_user(user_in: UserRegister, db: AsyncSession):
