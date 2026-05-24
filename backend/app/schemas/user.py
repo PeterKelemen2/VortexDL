@@ -6,6 +6,7 @@ class UserBase(BaseModel):
 
 class UserLogin(UserBase):
     password: str
+    device_name: str | None = None
 
 class UserRegister(UserLogin):
     email: EmailStr

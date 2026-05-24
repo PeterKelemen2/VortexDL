@@ -11,7 +11,10 @@ from sqlalchemy import select
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 from datetime import timedelta, datetime
+import asyncio
 import hashlib
+import re
+import socket
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 14
@@ -19,6 +22,20 @@ REFRESH_TOKEN_EXPIRE_DAYS = 14
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+async def resolve_hostname(ip: str | None) -> str | None:
+    """Attempt a reverse DNS lookup of the client IP.
+    Returns the short hostname (stripped of domain) or None on failure."""
+    if not ip or ip in ("127.0.0.1", "::1"):
+        return None
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, socket.gethostbyaddr, ip)
+        # result[0] is the full FQDN; take only the first label
+        return result[0].split(".")[0]
+    except (socket.herror, socket.gaierror, OSError):
+        return None
 
 
 def detect_device_os(user_agent: str | None) -> str:
@@ -37,6 +54,56 @@ def detect_device_os(user_agent: str | None) -> str:
     if "linux" in ua and "android" not in ua:
         return "linux"
     return "other"
+
+
+def detect_device_name(user_agent: str | None) -> str | None:
+    """Extract a human-readable device name from the User-Agent string.
+
+    Examples:
+      "Mozilla/5.0 (Linux; Android 15; 23053RN02Y) ..."  → "Android 15 23053RN02Y"
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 ...)"     → "iPhone (iOS 17.0)"
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ..."    → "Windows 10"
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"  → "macOS 10.15.7"
+    """
+    if not user_agent:
+        return None
+
+    ua = user_agent
+
+    # Android: extract version and device model
+    # UA pattern: (Linux; Android <version>; <model>)
+    m = re.search(r"Android\s+([\d.]+);\s*([^;)]+)", ua, re.IGNORECASE)
+    if m:
+        version = m.group(1).strip()
+        model = m.group(2).strip()
+        return f"Android {version} {model}"
+
+    # iPhone / iPad / iPod: extract iOS version
+    m = re.search(r"(iPhone|iPad|iPod).*?OS\s+([\d_]+)", ua, re.IGNORECASE)
+    if m:
+        device = m.group(1)
+        ios_version = m.group(2).replace("_", ".")
+        return f"{device} (iOS {ios_version})"
+
+    # Windows: map NT version to marketing name
+    m = re.search(r"Windows NT\s+([\d.]+)", ua, re.IGNORECASE)
+    if m:
+        nt_map = {"10.0": "10/11", "6.3": "8.1", "6.2": "8", "6.1": "7", "6.0": "Vista"}
+        nt = m.group(1)
+        win = nt_map.get(nt, nt)
+        return f"Windows {win}"
+
+    # macOS: extract version
+    m = re.search(r"Mac OS X\s+([\d_]+)", ua, re.IGNORECASE)
+    if m:
+        macos_version = m.group(1).replace("_", ".")
+        return f"macOS {macos_version}"
+
+    # Linux desktop fallback
+    if re.search(r"linux", ua, re.IGNORECASE) and "android" not in ua.lower():
+        return "Linux PC"
+
+    return None
 
 
 async def authenticate_user(session: AsyncSession, username: str, password: str):
@@ -67,11 +134,19 @@ async def create_tokens(
     if device_os is None:
         device_os = detect_device_os(user_agent)
 
+    # UA parsing is more accurate than what the browser reports via navigator.platform;
+    # only keep the frontend-supplied name if UA parsing produces nothing.
+    ua_name = detect_device_name(user_agent)
+    if ua_name:
+        device_name = ua_name
+    elif device_name is None:
+        device_name = device_os
+
     refresh_token = RefreshToken(
         user_id=user.id,
         token_hash=token_hash,
         device_os=device_os,
-        device_name=device_name or device_os,
+        device_name=device_name,
         user_agent=user_agent[:1024] if user_agent else None,
         expires_at=expires_at,
     )
@@ -152,15 +227,18 @@ async def refresh_tokens(
     device_name: str | None = None,
     device_os: str | None = None,
     user_agent: str | None = None,
+    client_ip: str | None = None,
 ):
     if isinstance(data, UserLogin):
         user = await authenticate_user(db, data.username, data.password)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
+        # Prefer explicit device_name, then reverse DNS hostname, then UA-derived name
+        resolved_name = device_name or (await resolve_hostname(client_ip))
         access_token, refresh_token = await create_tokens(
             db,
             user,
-            device_name=device_name,
+            device_name=resolved_name,
             device_os=device_os,
             user_agent=user_agent,
         )

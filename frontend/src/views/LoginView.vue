@@ -12,12 +12,27 @@ const error = ref('')
 const success = ref('')
 const showPassword = ref(false)
 
+async function getDeviceName() {
+  if (navigator.userAgentData?.getHighEntropyValues) {
+    try {
+      const data = await navigator.userAgentData.getHighEntropyValues([
+        'platform',
+        'platformVersion',
+        'model',
+      ])
+      const parts = [data.platform, data.platformVersion, data.model].filter(Boolean)
+      if (parts.length) return parts.join(' ')
+    } catch { /* browser denied or API not supported */ }
+  }
+  return navigator.platform || navigator.userAgent || undefined
+}
+
 async function onLogin() {
   loading.value = true
   error.value = ''
   success.value = ''
   try {
-    await auth.login(form.value.username, form.value.password)
+    await auth.login(form.value.username, form.value.password, await getDeviceName())
     success.value = 'Login successful! Redirecting...'
     await new Promise((resolve) => setTimeout(resolve, 1000))
     await router.push('/')

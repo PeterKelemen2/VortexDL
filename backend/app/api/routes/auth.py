@@ -22,9 +22,13 @@ async def register(user_in: UserRegister, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 async def login(form: UserLogin, request: Request, db: AsyncSession = Depends(get_db)):
+    client_ip = request.client.host if request.client else None
+    print(client_ip)
     return await refresh_tokens(
         form,
         db,
+        device_name=form.device_name,
+        client_ip=client_ip,
         user_agent=request.headers.get("user-agent"),
     )
 

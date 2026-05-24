@@ -40,8 +40,10 @@ export const useAuthStore = defineStore('auth', () => {
     initialized.value = true
   }
 
-  async function login(username, password) {
-    const tokens = await api.login({ username, password })
+  async function login(username, password, deviceName = null) {
+    const payload = { username, password }
+    if (deviceName) payload.device_name = deviceName
+    const tokens = await api.login(payload)
     _setTokens(tokens.access_token, tokens.refresh_token)
     user.value = await api.getCurrentUser(accessToken.value)
     initialized.value = true
