@@ -7,10 +7,13 @@ const auth = useAuthStore()
 const sessions = ref([])
 const loading = ref(false)
 const error = ref('')
+const revokingSessionId = ref(null)
+const successMessage = ref('')
 
 async function loadSessions() {
   loading.value = true
   error.value = ''
+  successMessage.value = ''
   try {
     const token = auth.accessToken
     sessions.value = await api.getSessions(token)
@@ -18,6 +21,27 @@ async function loadSessions() {
     error.value = e.message
   } finally {
     loading.value = false
+  }
+}
+
+async function revokeSession(sessionId) {
+  if (!auth.accessToken) {
+    error.value = 'Unable to revoke session: not authenticated.'
+    return
+  }
+
+  revokingSessionId.value = sessionId
+  error.value = ''
+  successMessage.value = ''
+
+  try {
+    await api.revokeSession(sessionId, auth.accessToken)
+    successMessage.value = 'Session revoked successfully.'
+    await loadSessions()
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    revokingSessionId.value = null
   }
 }
 
@@ -35,6 +59,9 @@ onMounted(loadSessions)
 
     <div v-if="loading" class="text-center py-8">Loading sessions…</div>
     <div v-else-if="error" class="text-center text-red-600 font-medium">{{ error }}</div>
+    <div v-else-if="successMessage" class="text-center text-green-600 font-medium">
+      {{ successMessage }}
+    </div>
     <div v-else-if="sessions.length === 0" class="text-center text-gray-600">
       No active sessions found.
     </div>
@@ -64,10 +91,20 @@ onMounted(loadSessions)
             </p>
           </div>
         </div>
-        <p class="mt-3 text-sm text-gray-600 wrap-break-word">
-          <span class="font-medium">User Agent:</span>
-          {{ session.user_agent || 'Not available' }}
-        </p>
+        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-sm text-gray-600 wrap-break-word">
+            <span class="font-medium">User Agent:</span>
+            {{ session.user_agent || 'Not available' }}
+          </p>
+          <button
+            class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="revokingSessionId === session.id"
+            @click="revokeSession(session.id)"
+          >
+            <span v-if="revokingSessionId === session.id">Revoking…</span>
+            <span v-else>Revoke session</span>
+          </button>
+        </div>
       </li>
     </ul>
   </div>
