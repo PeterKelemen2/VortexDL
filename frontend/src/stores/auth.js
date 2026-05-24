@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { api } from '@/utils/api'
 
 export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref(localStorage.getItem('accessToken') || null)
+  const accessToken = ref(null)
   const user = ref(null)
   const initialized = ref(false)
 
@@ -64,11 +64,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setAccessToken(token) {
     accessToken.value = token
-    if (token) {
-      localStorage.setItem('accessToken', token)
-    } else {
-      localStorage.removeItem('accessToken')
-    }
   }
 
   function _clearAuth() {
@@ -76,7 +71,6 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     initPromise = null
     initialized.value = false
-    localStorage.removeItem('accessToken')
   }
 
   return {

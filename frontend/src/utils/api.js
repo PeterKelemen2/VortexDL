@@ -16,6 +16,18 @@ function sanitizeBody(body) {
   }, {})
 }
 
+function getCookie(name) {
+  return document.cookie.split(';').reduce((current, cookie) => {
+    const [cookieName, ...cookieValue] = cookie.trim().split('=')
+    return cookieName === name ? decodeURIComponent(cookieValue.join('=')) : current
+  }, null)
+}
+
+function getCsrfHeader() {
+  const csrfToken = getCookie('csrf_token')
+  return csrfToken ? { 'X-CSRF-Token': csrfToken } : {}
+}
+
 async function request(path, { method = 'GET', body, headers = {}, token } = {}) {
   const opts = {
     method,
@@ -53,8 +65,9 @@ async function request(path, { method = 'GET', body, headers = {}, token } = {})
 }
 
 async function requestWithAuth(path, { method = 'GET', body, headers = {}, token, onTokenRefresh } = {}) {
+  const combinedHeaders = { ...headers, ...getCsrfHeader() }
   try {
-    return await request(path, { method, body, headers, token })
+    return await request(path, { method, body, headers: combinedHeaders, token })
   } catch (error) {
     if (error?.status === 401 && !['/auth/refresh', '/auth/login'].includes(path)) {
       const refreshResponse = await refresh()
@@ -65,7 +78,7 @@ async function requestWithAuth(path, { method = 'GET', body, headers = {}, token
         return await request(path, {
           method,
           body,
-          headers,
+          headers: { ...combinedHeaders, ...getCsrfHeader() },
           token: refreshResponse.access_token,
         })
       }
@@ -77,8 +90,8 @@ async function requestWithAuth(path, { method = 'GET', body, headers = {}, token
 export const api = {
   login: (payload) => request('/auth/login', { method: 'POST', body: payload }),
   register: (payload) => request('/auth/register', { method: 'POST', body: payload }),
-  refresh: () => request('/auth/refresh', { method: 'POST' }),
-  logout: () => request('/auth/logout', { method: 'POST' }),
+  refresh: () => request('/auth/refresh', { method: 'POST', headers: getCsrfHeader() }),
+  logout: () => request('/auth/logout', { method: 'POST', headers: getCsrfHeader() }),
 
   getCurrentUser: (token, onTokenRefresh) => requestWithAuth('/auth/me', { token, onTokenRefresh }),
   getSessions: (token, onTokenRefresh) => requestWithAuth('/auth/sessions', { token, onTokenRefresh }),

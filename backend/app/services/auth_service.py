@@ -165,7 +165,10 @@ async def create_tokens(
     access_token = create_access_token(
         data={"sub": str(user.id), "role": user.role.name, "sid": refresh_token.id},
         secret=settings.JWT_SECRET,
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+        issuer=settings.JWT_ISSUER,
+        audience=settings.JWT_AUDIENCE,
+        algorithm=settings.JWT_ALGORITHM,
     )
     return access_token, raw_refresh
 
@@ -270,6 +273,9 @@ async def refresh_tokens(
         )
         return TokenResponse(access_token=access_token, refresh_token=refresh_token)
     elif isinstance(data, TokenRefreshRequest):
+        if not data.refresh_token:
+            raise HTTPException(status_code=401, detail="Refresh token required")
+
         token_hash_val = hash_token(data.refresh_token)
         stmt = select(RefreshToken).where(
             RefreshToken.token_hash == token_hash_val,
