@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/utils/api'
+import Modal from '@/components/Modal.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -11,6 +12,8 @@ const loading = ref(false)
 const error = ref('')
 const revokingSessionId = ref(null)
 const successMessage = ref('')
+const showConfirmModal = ref(false)
+const pendingRevokeSession = ref(null)
 
 async function loadSessions() {
   loading.value = true
@@ -26,14 +29,19 @@ async function loadSessions() {
   }
 }
 
-async function revokeSession(sessionId) {
+function openRevokeModal(session) {
+  pendingRevokeSession.value = session
+  showConfirmModal.value = true
+}
+
+async function revokeSession(session) {
   if (!auth.accessToken) {
     error.value = 'Unable to revoke session: not authenticated.'
     return
   }
 
-  const session = sessions.value.find((item) => item.id === sessionId)
-  const isCurrentSession = Boolean(session?.current)
+  const sessionId = session.id
+  const isCurrentSession = Boolean(session.current)
 
   revokingSessionId.value = sessionId
   error.value = ''
@@ -52,7 +60,19 @@ async function revokeSession(sessionId) {
     error.value = e.message
   } finally {
     revokingSessionId.value = null
+    pendingRevokeSession.value = null
+    showConfirmModal.value = false
   }
+}
+
+async function confirmRevokeSession() {
+  if (!pendingRevokeSession.value) return
+  await revokeSession(pendingRevokeSession.value)
+}
+
+function cancelRevoke() {
+  pendingRevokeSession.value = null
+  showConfirmModal.value = false
 }
 
 onMounted(loadSessions)
@@ -114,7 +134,7 @@ onMounted(loadSessions)
           <button
             class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="revokingSessionId === session.id"
-            @click="revokeSession(session.id)"
+            @click="openRevokeModal(session)"
           >
             <span v-if="revokingSessionId === session.id">Revoking…</span>
             <span v-else>
@@ -124,6 +144,41 @@ onMounted(loadSessions)
         </div>
       </li>
     </ul>
+    <Modal
+      v-model="showConfirmModal"
+      title="Revoke session"
+      @close="cancelRevoke"
+    >
+      <div class="space-y-4">
+        <p class="text-sm text-slate-700">
+          Are you sure you want to revoke this session?
+        </p>
+        <p class="text-sm text-slate-600">
+          <strong>Host:</strong> {{ pendingRevokeSession?.resolved_name || 'Unknown host' }}<br />
+          <strong>Device:</strong> {{ pendingRevokeSession?.device_name || 'Unknown device' }}
+        </p>
+        <p v-if="pendingRevokeSession?.current" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Revoking your current session will sign you out immediately.
+        </p>
+        <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            class="btn bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
+            @click="cancelRevoke"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn bg-primary text-white hover:bg-primary-dark"
+            :disabled="revokingSessionId === pendingRevokeSession?.id"
+            @click="confirmRevokeSession"
+          >
+            {{ revokingSessionId === pendingRevokeSession?.id ? 'Revoking…' : 'Confirm revoke' }}
+          </button>
+        </div>
+      </div>
+    </Modal>
   </div>
 </template>
 
