@@ -4,7 +4,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from fastapi.testclient import TestClient
+from httpx import AsyncClient, ASGITransport
 import pytest
 from sqlalchemy import text
 
@@ -42,24 +42,23 @@ async def _initialize_database() -> None:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
-
 async def _truncate_tables() -> None:
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM refresh_tokens"))
         await conn.execute(text("DELETE FROM users"))
         await conn.execute(text("DELETE FROM roles"))
 
-
 asyncio.run(_initialize_database())
 
-
 @pytest.fixture(scope="function")
-def client():
-    with TestClient(app) as client_instance:
+async def client():
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver"
+    ) as client_instance:
         yield client_instance
 
-
 @pytest.fixture(autouse=True)
-def cleanup_db():
-    asyncio.run(_truncate_tables())
+async def cleanup_db():
+    await _truncate_tables()
     yield
