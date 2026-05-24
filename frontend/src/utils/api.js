@@ -28,6 +28,12 @@ function getCsrfHeader() {
   return csrfToken ? { 'X-CSRF-Token': csrfToken } : {}
 }
 
+function hasSessionCookies() {
+  // refresh_token is stored in HttpOnly cookie and is not accessible from JS.
+  // Use csrf_token as a visible session indicator instead.
+  return !!getCookie('csrf_token')
+}
+
 async function request(path, { method = 'GET', body, headers = {}, token } = {}) {
   const opts = {
     method,
@@ -87,7 +93,7 @@ async function requestWithAuth(path, { method = 'GET', body, headers = {}, token
   }
 }
 
-export const api = {
+const api = {
   login: (payload) => request('/auth/login', { method: 'POST', body: payload }),
   register: (payload) => request('/auth/register', { method: 'POST', body: payload }),
   refresh: () => request('/auth/refresh', { method: 'POST', headers: getCsrfHeader() }),
@@ -111,3 +117,5 @@ export const api = {
     onTokenRefresh,
   }),
 }
+
+export { hasSessionCookies, api }

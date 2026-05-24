@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { api } from '@/utils/api'
+import { api, hasSessionCookies } from '@/utils/api'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(null)
@@ -30,6 +30,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     try {
+      if (!hasSessionCookies()) {
+        initialized.value = true
+        return
+      }
       const tokens = await api.refresh()
       setAccessToken(tokens.access_token)
       user.value = await api.getCurrentUser(tokens.access_token, setAccessToken)
