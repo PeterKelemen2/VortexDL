@@ -305,20 +305,28 @@ async def register_user(user_in: UserRegister, db: AsyncSession):
     if user_in.password != user_in.password_confirm:
         raise HTTPException(status_code=400, detail="Passwords do not match")
 
+    username = user_in.username.strip()
+    email = user_in.email.strip().lower()
+
     validate_password_strength(user_in.password)
-    
-    stmt = select(User).where(User.username == user_in.username)
+
+    stmt = select(User).where(User.username == username)
     result = await db.execute(stmt)
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already registered")
+
+    email_stmt = select(User).where(User.email == email)
+    email_result = await db.execute(email_stmt)
+    if email_result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email already registered")
 
     existing = await ensure_roles_exist(db)
     assigned_role = existing["user"]
 
     hashed_pw = hash_password(user_in.password)
     user = User(
-        username=user_in.username,
-        email=user_in.email,
+        username=username,
+        email=email,
         hashed_password=hashed_pw,
         role_id=assigned_role.id,
         created_at=datetime.utcnow(),
@@ -352,13 +360,16 @@ async def refresh_tokens(
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
         resolved_name = await resolve_hostname(client_ip)
-        print('[auth] refresh_tokens login', {
-            'username': data.username,
-            'client_ip': client_ip,
-            'received_device_name': data.device_name,
-            'resolved_name': resolved_name,
-            'user_agent': user_agent,
-        })
+        logger.info(
+            "User login successful",
+            extra={
+                "username": data.username,
+                "client_ip": client_ip,
+                "received_device_name": data.device_name,
+                "resolved_name": resolved_name,
+                "user_agent": user_agent,
+            },
+        )
         access_token, refresh_token = await create_tokens(
             db,
             user,

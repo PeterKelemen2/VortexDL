@@ -1,7 +1,8 @@
 
+import logging
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Body
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_db, get_current_user
 from app.core.config import settings
@@ -24,10 +25,12 @@ CSRF_COOKIE_NAME = "csrf_token"
 CSRF_HEADER_NAME = "X-CSRF-Token"
 
 
+logger = logging.getLogger(__name__)
+
 def _cookie_settings(request: Request) -> dict:
     secure = request.url.scheme == "https"
-    samesite = "none" if secure else "lax"
-    return {"secure": secure, "samesite": samesite}
+    same_site = settings.COOKIE_SAMESITE
+    return {"secure": secure, "samesite": same_site}
 
 
 def _set_refresh_cookie(response: Response, request: Request, refresh_token: str) -> None:
@@ -95,12 +98,15 @@ async def login(
 ):
     client_ip = request.client.host if request.client else None
     user_agent_header = request.headers.get('user-agent')
-    print('[auth] login attempt', {
-        'username': form.username,
-        'client_ip': client_ip,
-        'device_name': form.device_name,
-        'user_agent': form.user_agent or user_agent_header,
-    })
+    logger.info(
+        "Login attempt",
+        extra={
+            "username": form.username,
+            "client_ip": client_ip,
+            "device_name": form.device_name,
+            "user_agent": form.user_agent or user_agent_header,
+        },
+    )
     token_response = await refresh_tokens(
         form,
         db,
@@ -119,13 +125,11 @@ async def refresh(
     request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
-    token_req: TokenRefreshRequest | None = Body(default=None),
 ):
     _require_csrf(request)
-    token_req = token_req or TokenRefreshRequest()
-    token_req.refresh_token = token_req.refresh_token or request.cookies.get("refresh_token")
+    refresh_token = request.cookies.get("refresh_token")
     token_response = await refresh_tokens(
-        token_req,
+        TokenRefreshRequest(refresh_token=refresh_token),
         db,
         user_agent=request.headers.get("user-agent"),
     )
@@ -140,14 +144,12 @@ async def logout(
     request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
-    token_req: TokenRefreshRequest | None = Body(default=None),
 ):
     _require_csrf(request)
-    token_req = token_req or TokenRefreshRequest()
-    token_req.refresh_token = token_req.refresh_token or request.cookies.get("refresh_token")
+    refresh_token = request.cookies.get("refresh_token")
     _clear_refresh_cookie(response, request)
     _clear_csrf_cookie(response, request)
-    await logout_refresh_token(token_req, db)
+    await logout_refresh_token(TokenRefreshRequest(refresh_token=refresh_token), db)
     return {"msg": "Logged out"}
 
 
@@ -175,11 +177,6 @@ async def revoke_current_session(
     db: AsyncSession = Depends(get_db),
 ):
     _require_csrf(request)
-    current_session_id = getattr(current_user, "current_session_id", None)
-    if current_session_id is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No active session to revoke")
-    await revoke_refresh_session(current_session_id, current_user, db)
-    return None
     current_session_id = getattr(current_user, "current_session_id", None)
     if current_session_id is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No active session to revoke")

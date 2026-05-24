@@ -149,7 +149,7 @@ async function onRegister() {
         </div>
         <div>
           <label class="block text-gray-700 mb-1 font-medium">Email</label>
-          <input v-model="form.email" type="email" autocomplete="email" />
+          <input v-model="form.email" type="email" required autocomplete="email" />
         </div>
         <div>
           <label class="block text-gray-700 mb-1 font-medium">Password</label>
@@ -158,13 +158,12 @@ async function onRegister() {
               v-model="form.password"
               :type="showPassword ? 'text' : 'password'"
               required
-              autocomplete="current-password"
+              autocomplete="new-password"
             />
             <button
               type="button"
               @click="showPassword = !showPassword"
               class="absolute right-2 top-1/2 -translate-y-1/2 text-blue-600 hover:text-blue-800 p-1"
-              tabindex="-1"
               aria-label="Toggle password visibility"
             >
               <component :is="showPassword ? EyeOff : Eye" class="w-5 h-5" />
@@ -224,7 +223,6 @@ async function onRegister() {
               type="button"
               @click="showPasswordConf = !showPasswordConf"
               class="absolute right-2 top-1/2 -translate-y-1/2 text-blue-600 hover:text-blue-800 p-1"
-              tabindex="-1"
               aria-label="Toggle password visibility"
             >
               <component :is="showPasswordConf ? EyeOff : Eye" class="w-5 h-5" />

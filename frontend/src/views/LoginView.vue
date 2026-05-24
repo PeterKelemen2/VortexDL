@@ -40,7 +40,12 @@ async function onLogin() {
   success.value = ''
   try {
     const deviceData = await getDeviceData()
-    await auth.login(form.value.username, form.value.password, deviceData.deviceName, deviceData.userAgent)
+    await auth.login(
+      form.value.username,
+      form.value.password,
+      deviceData.deviceName,
+      deviceData.userAgent,
+    )
     success.value = 'Login successful! Redirecting...'
     await new Promise((resolve) => setTimeout(resolve, 1000))
     await router.push('/')
@@ -76,7 +81,6 @@ async function onLogin() {
               type="button"
               @click="showPassword = !showPassword"
               class="absolute right-2 top-1/2 -translate-y-1/2 text-blue-600 hover:text-blue-800 p-1"
-              tabindex="-1"
               aria-label="Toggle password visibility"
             >
               <component :is="showPassword ? EyeOff : Eye" class="w-5 h-5" />

@@ -10,13 +10,13 @@ class Settings:
     SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite+aiosqlite:///./app.db")
     JWT_SECRET = os.getenv("JWT_SECRET")
     if not JWT_SECRET:
-        if DEBUG:
-            JWT_SECRET = "super-secret-key"
-        else:
-            raise RuntimeError("JWT_SECRET must be set in environment")
+        raise RuntimeError("JWT_SECRET must be set in environment")
     JWT_ISSUER = os.getenv("JWT_ISSUER", "ytdlp_client")
     JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "ytdlp_client")
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+    COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax").lower()
+    if COOKIE_SAMESITE not in {"lax", "strict", "none"}:
+        COOKIE_SAMESITE = "lax"
     INITIAL_ADMIN_USERNAME = os.getenv("INITIAL_ADMIN_USERNAME")
     INITIAL_ADMIN_EMAIL = os.getenv("INITIAL_ADMIN_EMAIL")
     INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD")
