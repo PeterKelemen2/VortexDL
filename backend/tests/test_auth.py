@@ -1,10 +1,13 @@
 import asyncio
-from datetime import datetime
+import hashlib
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 
 from app.core.db import async_session
-from app.core.security import hash_password
+from app.core.security import create_access_token, hash_password
+from app.core.config import settings
+from app.models.refresh_token import RefreshToken
 from app.models.role import Role
 from app.models.user import User
 
@@ -30,6 +33,11 @@ def csrf_header(client):
 def assert_validation_error(response, message):
     assert response.status_code == 400
     assert response.json().get("detail") == message
+
+
+def assert_unprocessable(response):
+    assert response.status_code == 422
+    assert isinstance(response.json().get("detail"), list)
 
 
 def create_admin_user(username="adminuser", email="admin@example.com", password="Admin123!"):
@@ -117,6 +125,234 @@ def test_refresh_rotates_and_revokes_old_refresh_token(client):
     client.cookies.set("refresh_token", old_refresh_token, path="/auth")
     stale_refresh_response = client.post("/auth/refresh", headers=csrf_header(client))
     assert stale_refresh_response.status_code == 401
+
+
+def test_refresh_without_refresh_cookie_returns_401(client):
+    client.post("/auth/register", json=register_payload())
+    client.post("/auth/login", json=login_payload())
+    csrf_token = client.cookies.get("csrf_token")
+    client.cookies.clear()
+    client.cookies.set("csrf_token", csrf_token, path="/")
+
+    response = client.post("/auth/refresh", headers=csrf_header(client))
+    assert response.status_code == 401
+
+
+def test_refresh_with_expired_cookie_returns_401(client):
+    client.post("/auth/register", json=register_payload())
+    client.post("/auth/login", json=login_payload())
+    raw_refresh = client.cookies.get("refresh_token")
+    assert raw_refresh is not None
+    token_hash = hashlib.sha256(raw_refresh.encode()).hexdigest()
+
+    async def expire_token():
+        async with async_session() as session:
+            stmt = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+            result = await session.execute(stmt)
+            token = result.scalar_one_or_none()
+            assert token is not None
+            token.expires_at = datetime.utcnow()
+            await session.commit()
+
+    asyncio.run(expire_token())
+
+    response = client.post("/auth/refresh", headers=csrf_header(client))
+    assert response.status_code == 401
+
+
+def test_invalid_bearer_token_returns_401_for_protected_endpoints(client):
+    response = client.get(
+        "/auth/me",
+        headers={"Authorization": "Bearer invalid.token.value"},
+    )
+    assert response.status_code == 401
+
+    response = client.get(
+        "/admin/users",
+        headers={"Authorization": "Bearer invalid.token.value"},
+    )
+    assert response.status_code == 401
+
+
+def test_login_does_not_return_refresh_token_in_body(client):
+    client.post("/auth/register", json=register_payload())
+    login_response = client.post("/auth/login", json=login_payload())
+    assert login_response.status_code == 200
+    assert "refresh_token" not in login_response.json()
+
+
+def test_refresh_requires_csrf_cookie_when_refresh_cookie_present(client):
+    client.post("/auth/register", json=register_payload())
+    client.post("/auth/login", json=login_payload())
+    refresh_token = client.cookies.get("refresh_token")
+    assert refresh_token is not None
+
+    client.cookies.delete("csrf_token", path="/")
+    response = client.post("/auth/refresh", headers={"X-CSRF-Token": ""})
+    assert response.status_code == 403
+    assert response.json().get("detail") == "Invalid CSRF token"
+
+
+def test_registration_invalid_email_and_required_fields(client):
+    invalid_email = client.post(
+        "/auth/register",
+        json=register_payload(email="not-an-email"),
+    )
+    assert_unprocessable(invalid_email)
+
+    missing_field = client.post(
+        "/auth/register",
+        json={"username": "partial", "password": "Password123!", "password_confirm": "Password123!"},
+    )
+    assert_unprocessable(missing_field)
+
+
+def test_admin_route_unauthenticated_returns_401(client):
+    response = client.get("/admin/users")
+    assert response.status_code == 401
+
+
+def test_logout_requires_csrf_token(client):
+    client.post("/auth/register", json=register_payload())
+    client.post("/auth/login", json=login_payload())
+
+    response = client.post("/auth/logout")
+    assert response.status_code == 403
+    assert response.json().get("detail") == "Invalid CSRF token"
+
+
+def test_logout_without_refresh_cookie_still_succeeds(client):
+    client.post("/auth/register", json=register_payload())
+    client.post("/auth/login", json=login_payload())
+    csrf_token = client.cookies.get("csrf_token")
+    client.cookies.clear()
+    client.cookies.set("csrf_token", csrf_token, path="/")
+
+    response = client.post("/auth/logout", headers=csrf_header(client))
+    assert response.status_code == 200
+    assert client.cookies.get("refresh_token") in (None, "")
+
+
+def test_delete_session_by_id_removes_session_from_list(client):
+    client.post("/auth/register", json=register_payload())
+    login_response = client.post("/auth/login", json=login_payload())
+    access_token = login_response.json()["access_token"]
+
+    sessions_response = client.get(
+        "/auth/sessions",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert sessions_response.status_code == 200
+    current_session = next((session for session in sessions_response.json() if session.get("current")), None)
+    assert current_session is not None
+    session_id = current_session["id"]
+
+    delete_response = client.delete(
+        f"/auth/sessions/{session_id}",
+        headers={
+            **csrf_header(client),
+            "Authorization": f"Bearer {access_token}",
+        },
+    )
+    assert delete_response.status_code == 204
+
+    verify_response = client.get(
+        "/auth/sessions",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert verify_response.status_code == 401
+
+
+def test_user_cannot_revoke_another_users_session(client):
+    client.post("/auth/register", json=register_payload(username="user1", email="user1@example.com"))
+    login1 = client.post("/auth/login", json=login_payload(username="user1", password="Password123!"))
+    token1 = login1.json()["access_token"]
+    sessions1 = client.get(
+        "/auth/sessions",
+        headers={"Authorization": f"Bearer {token1}"},
+    )
+    assert sessions1.status_code == 200
+    session_id = sessions1.json()[0]["id"]
+
+    client.post("/auth/register", json=register_payload(username="user2", email="user2@example.com"))
+    login2 = client.post("/auth/login", json=login_payload(username="user2", password="Password123!"))
+    token2 = login2.json()["access_token"]
+
+    revoke_response = client.delete(
+        f"/auth/sessions/{session_id}",
+        headers={"Authorization": f"Bearer {token2}", **csrf_header(client)},
+    )
+    assert revoke_response.status_code == 404
+
+    sessions2 = client.get(
+        "/auth/sessions",
+        headers={"Authorization": f"Bearer {token2}"},
+    )
+    assert sessions2.status_code == 200
+    assert len(sessions2.json()) == 1
+
+
+def test_session_list_is_invalid_after_logout(client):
+    client.post("/auth/register", json=register_payload())
+    login_response = client.post("/auth/login", json=login_payload())
+    access_token = login_response.json()["access_token"]
+
+    logout_response = client.post("/auth/logout", headers=csrf_header(client))
+    assert logout_response.status_code == 200
+
+    sessions_response = client.get(
+        "/auth/sessions",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert sessions_response.status_code == 401
+
+
+def test_tampered_access_token_with_wrong_sid_is_rejected(client):
+    register1 = client.post("/auth/register", json=register_payload(username="user1", email="user1@example.com"))
+    assert register1.status_code == 200
+    user1_id = register1.json()["id"]
+
+    client.post("/auth/register", json=register_payload(username="user2", email="user2@example.com"))
+    login2 = client.post("/auth/login", json=login_payload(username="user2", password="Password123!"))
+    token2 = login2.json()["access_token"]
+
+    sessions2 = client.get(
+        "/auth/sessions",
+        headers={"Authorization": f"Bearer {token2}"},
+    )
+    assert sessions2.status_code == 200
+    other_session_id = sessions2.json()[0]["id"]
+
+    tampered_token = create_access_token(
+        data={"sub": str(user1_id), "role": "user", "sid": other_session_id},
+        secret=settings.JWT_SECRET,
+        expires_delta=timedelta(minutes=15),
+        issuer=settings.JWT_ISSUER,
+        audience=settings.JWT_AUDIENCE,
+        algorithm=settings.JWT_ALGORITHM,
+    )
+
+    response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {tampered_token}"},
+    )
+    assert response.status_code == 401
+
+
+def test_registration_rejects_weak_password(client):
+    payload = register_payload(password="weakpass", email="weak@example.com")
+    payload["password_confirm"] = payload["password"]
+    response = client.post("/auth/register", json=payload)
+    assert response.status_code == 400
+    assert "Password must contain" in response.json().get("detail", "")
+
+
+def test_registration_email_uniqueness_is_case_insensitive(client):
+    first = client.post("/auth/register", json=register_payload(email="Case@Example.com"))
+    assert first.status_code == 200
+
+    second = client.post("/auth/register", json=register_payload(username="another", email="case@example.com"))
+    assert_validation_error(second, "Email already registered")
 
 
 def test_admin_route_restricts_non_admin_users(client):
