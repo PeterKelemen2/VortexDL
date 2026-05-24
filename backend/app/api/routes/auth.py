@@ -52,7 +52,8 @@ async def logout(token_req: TokenRefreshRequest, db: AsyncSession = Depends(get_
 
 @router.get("/sessions", response_model=list[RefreshTokenSession])
 async def sessions(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    return await list_refresh_sessions(db, current_user)
+    current_session_id = getattr(current_user, "current_session_id", None)
+    return await list_refresh_sessions(db, current_user, current_session_id)
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_session(

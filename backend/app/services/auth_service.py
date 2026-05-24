@@ -123,11 +123,6 @@ async def create_tokens(
     device_os: str | None = None,
     user_agent: str | None = None,
 ):
-    access_token = create_access_token(
-        data={"sub": str(user.id), "role": user.role.name},
-        secret=settings.JWT_SECRET,
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
     raw_refresh = create_refresh_token()
     token_hash = hash_token(raw_refresh)
     expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
@@ -165,6 +160,13 @@ async def create_tokens(
     )
     session.add(refresh_token)
     await session.commit()
+    await session.refresh(refresh_token)
+
+    access_token = create_access_token(
+        data={"sub": str(user.id), "role": user.role.name, "sid": refresh_token.id},
+        secret=settings.JWT_SECRET,
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     return access_token, raw_refresh
 
 
@@ -310,14 +312,17 @@ async def logout_refresh_token(token_req: TokenRefreshRequest, db: AsyncSession)
     return {"msg": "Logged out"}
 
 
-async def list_refresh_sessions(db: AsyncSession, user: User):
+async def list_refresh_sessions(db: AsyncSession, user: User, current_session_id: int | None = None):
     stmt = select(RefreshToken).where(
         RefreshToken.user_id == user.id,
         RefreshToken.revoked == False,
         RefreshToken.expires_at > datetime.utcnow(),
     )
     result = await db.execute(stmt)
-    return result.scalars().all()
+    sessions = result.scalars().all()
+    for session_obj in sessions:
+        setattr(session_obj, 'current', session_obj.id == current_session_id)
+    return sessions
 
 
 async def revoke_refresh_session(session_id: int, user: User, db: AsyncSession):

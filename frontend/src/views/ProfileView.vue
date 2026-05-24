@@ -1,8 +1,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/utils/api'
 
+const router = useRouter()
 const auth = useAuthStore()
 const sessions = ref([])
 const loading = ref(false)
@@ -30,12 +32,20 @@ async function revokeSession(sessionId) {
     return
   }
 
+  const session = sessions.value.find((item) => item.id === sessionId)
+  const isCurrentSession = Boolean(session?.current)
+
   revokingSessionId.value = sessionId
   error.value = ''
   successMessage.value = ''
 
   try {
     await api.revokeSession(sessionId, auth.accessToken)
+    if (isCurrentSession) {
+      await auth.logout()
+      router.push({ name: 'login' })
+      return
+    }
     successMessage.value = 'Session revoked successfully.'
     await loadSessions()
   } catch (e) {
@@ -78,9 +88,14 @@ onMounted(loadSessions)
               <p class="text-lg font-semibold text-gray-900">
                 {{ session.resolved_name || 'Unknown host' }}
               </p>
-              <p class="text-sm text-gray-500">
-                {{ session.device_name || 'Unknown device' }}
-              </p>
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="text-sm text-gray-500">
+                  {{ session.device_name || 'Unknown device' }}
+                </p>
+                <span v-if="session.current" class="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
+                  Current session
+                </span>
+              </div>
             </div>
           </div>
           <div class="text-sm text-gray-500 text-right">
@@ -102,7 +117,9 @@ onMounted(loadSessions)
             @click="revokeSession(session.id)"
           >
             <span v-if="revokingSessionId === session.id">Revoking…</span>
-            <span v-else>Revoke session</span>
+            <span v-else>
+              {{ session.current ? 'Revoke current session' : 'Revoke session' }}
+            </span>
           </button>
         </div>
       </li>

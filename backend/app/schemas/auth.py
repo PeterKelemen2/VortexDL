@@ -17,6 +17,7 @@ class RefreshTokenSession(BaseModel):
     created_at: datetime
     last_used_at: datetime | None
     expires_at: datetime
+    current: bool = False
 
     class Config:
         from_attributes = True

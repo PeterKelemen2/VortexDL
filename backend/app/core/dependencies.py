@@ -1,8 +1,10 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
+from datetime import datetime
 from app.core.config import settings
 from app.models.user import User
+from app.models.refresh_token import RefreshToken
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
 from sqlalchemy import select
@@ -19,6 +21,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
         user_id: str = payload.get("sub")
+        session_id = payload.get("sid")
         if user_id is None:
             raise credentials_exception
     except JWTError:
@@ -28,6 +31,27 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
+
+    if session_id is not None:
+        try:
+            session_id = int(session_id)
+        except (TypeError, ValueError):
+            raise credentials_exception
+
+        token_stmt = select(RefreshToken).where(
+            RefreshToken.id == session_id,
+            RefreshToken.user_id == int(user_id),
+            RefreshToken.revoked == False,
+            RefreshToken.expires_at > datetime.utcnow(),
+        )
+        token_result = await db.execute(token_stmt)
+        refresh_session = token_result.scalar_one_or_none()
+        if refresh_session is None:
+            raise credentials_exception
+        setattr(user, "current_session_id", refresh_session.id)
+    else:
+        setattr(user, "current_session_id", None)
+
     return user
 
 def require_role(role_name: str):
