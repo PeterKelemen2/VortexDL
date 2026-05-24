@@ -13,6 +13,8 @@ const error = ref('')
 const success = ref('')
 const showPassword = ref(false)
 const showPasswordConf = ref(false)
+const confirmFocused = ref(false)
+const confirmTouched = ref(false)
 
 const strengthCriteria = computed(() => {
   const password = form.value.password || ''
@@ -65,6 +67,13 @@ const passwordStrengthLabel = computed(() => {
 const mandatoryCriteria = computed(() => strengthCriteria.value.filter((item) => item.mandatory))
 const isPasswordValid = computed(
   () => mandatoryCriteria.value.every((item) => item.valid) && passwordStrengthScore.value >= 2,
+)
+const showConfirmMismatch = computed(
+  () =>
+    isPasswordValid.value &&
+    (confirmFocused.value || confirmTouched.value) &&
+    form.value.password_confirm &&
+    form.value.password !== form.value.password_confirm,
 )
 const canSubmit = computed(() => {
   return (
@@ -208,6 +217,8 @@ async function onRegister() {
               :type="showPasswordConf ? 'text' : 'password'"
               required
               autocomplete="new-password"
+              @focus="confirmFocused = true"
+              @blur="confirmTouched = true"
             />
             <button
               type="button"
@@ -218,6 +229,9 @@ async function onRegister() {
             >
               <component :is="showPasswordConf ? EyeOff : Eye" class="w-5 h-5" />
             </button>
+          </div>
+          <div v-if="showConfirmMismatch" class="text-sm font-semibold text-red-600 mt-2">
+            Passwords do not match.
           </div>
         </div>
 
