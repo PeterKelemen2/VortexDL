@@ -4,7 +4,6 @@ import { api } from '@/utils/api'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(localStorage.getItem('accessToken') || null)
-  const refreshToken = ref(localStorage.getItem('refreshToken') || null)
   const user = ref(null)
   const initialized = ref(false)
 
@@ -22,63 +21,66 @@ export const useAuthStore = defineStore('auth', () => {
   async function _doInit() {
     if (accessToken.value) {
       try {
-        user.value = await api.getCurrentUser(accessToken.value)
+        user.value = await api.getCurrentUser(accessToken.value, setAccessToken)
+        initialized.value = true
+        return
       } catch {
-        if (refreshToken.value) {
-          try {
-            const tokens = await api.refresh(refreshToken.value)
-            _setTokens(tokens.access_token, tokens.refresh_token)
-            user.value = await api.getCurrentUser(accessToken.value)
-          } catch {
-            _clearAuth()
-          }
-        } else {
-          _clearAuth()
-        }
+        // access token might be expired or invalid
       }
     }
-    initialized.value = true
+
+    try {
+      const tokens = await api.refresh()
+      setAccessToken(tokens.access_token)
+      user.value = await api.getCurrentUser(tokens.access_token, setAccessToken)
+    } catch {
+      _clearAuth()
+    } finally {
+      initialized.value = true
+    }
   }
 
   async function login(username, password, deviceName = null, userAgent = null) {
     const payload = { username, password }
     if (deviceName) payload.device_name = deviceName
     if (userAgent) payload.user_agent = userAgent
+
     console.debug('[auth] login payload', { username, deviceName, userAgent })
     const tokens = await api.login(payload)
-    _setTokens(tokens.access_token, tokens.refresh_token)
-    user.value = await api.getCurrentUser(accessToken.value)
+    setAccessToken(tokens.access_token)
+    user.value = await api.getCurrentUser(tokens.access_token, setAccessToken)
     initialized.value = true
     initPromise = null
   }
 
   async function logout() {
-    if (refreshToken.value) {
-      try { await api.logout(refreshToken.value) } catch { /* best-effort */ }
+    try {
+      await api.logout()
+    } catch {
+      // best effort
     }
     _clearAuth()
   }
 
-  function _setTokens(access, refresh) {
-    accessToken.value = access
-    refreshToken.value = refresh
-    localStorage.setItem('accessToken', access)
-    localStorage.setItem('refreshToken', refresh)
+  function setAccessToken(token) {
+    accessToken.value = token
+    if (token) {
+      localStorage.setItem('accessToken', token)
+    } else {
+      localStorage.removeItem('accessToken')
+    }
   }
 
   function _clearAuth() {
     accessToken.value = null
-    refreshToken.value = null
     user.value = null
     initPromise = null
     initialized.value = false
     localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
   }
 
   return {
     accessToken,
-    refreshToken,
     user,
     initialized,
     isAuthenticated,
@@ -86,5 +88,6 @@ export const useAuthStore = defineStore('auth', () => {
     init,
     login,
     logout,
+    setAccessToken,
   }
 })

@@ -21,7 +21,7 @@ async function loadSessions() {
   successMessage.value = ''
   try {
     const token = auth.accessToken
-    sessions.value = await api.getSessions(token)
+    sessions.value = await api.getSessions(token, auth.setAccessToken)
   } catch (e) {
     error.value = e.message
   } finally {
@@ -48,7 +48,7 @@ async function revokeSession(session) {
   successMessage.value = ''
 
   try {
-    await api.revokeSession(sessionId, auth.accessToken)
+    await api.revokeSession(sessionId, auth.accessToken, auth.setAccessToken)
     if (isCurrentSession) {
       await auth.logout()
       router.push({ name: 'login' })
@@ -112,7 +112,10 @@ onMounted(loadSessions)
                 <p class="text-sm text-gray-500">
                   {{ session.device_name || 'Unknown device' }}
                 </p>
-                <span v-if="session.current" class="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
+                <span
+                  v-if="session.current"
+                  class="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700"
+                >
                   Current session
                 </span>
               </div>
@@ -144,20 +147,17 @@ onMounted(loadSessions)
         </div>
       </li>
     </ul>
-    <Modal
-      v-model="showConfirmModal"
-      title="Revoke session"
-      @close="cancelRevoke"
-    >
+    <Modal v-model="showConfirmModal" title="Revoke session" @close="cancelRevoke">
       <div class="space-y-4">
-        <p class="text-sm text-slate-700">
-          Are you sure you want to revoke this session?
-        </p>
+        <p class="text-sm text-slate-700">Are you sure you want to revoke this session?</p>
         <p class="text-sm text-slate-600">
           <strong>Host:</strong> {{ pendingRevokeSession?.resolved_name || 'Unknown host' }}<br />
           <strong>Device:</strong> {{ pendingRevokeSession?.device_name || 'Unknown device' }}
         </p>
-        <p v-if="pendingRevokeSession?.current" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <p
+          v-if="pendingRevokeSession?.current"
+          class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
           Revoking your current session will sign you out immediately.
         </p>
         <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">

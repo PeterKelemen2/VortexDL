@@ -23,7 +23,9 @@ async function request(path, { method = 'GET', body, headers = {}, token } = {})
       'Content-Type': 'application/json',
       ...headers,
     },
+    credentials: 'include',
   }
+
   if (body) opts.body = JSON.stringify(body)
   if (token) opts.headers['Authorization'] = `Bearer ${token}`
 
@@ -31,7 +33,7 @@ async function request(path, { method = 'GET', body, headers = {}, token } = {})
   console.debug('[api] request', { path, method, body: sanitizedBody, token: !!token })
 
   const res = await fetch(`${BACKEND_URL}${path}`, opts)
-  let data
+  let data = null
   try {
     data = await res.json()
   } catch {
@@ -42,17 +44,57 @@ async function request(path, { method = 'GET', body, headers = {}, token } = {})
 
   if (!res.ok) {
     console.error('[api] error', { path, status: res.status, data })
-    throw new Error(data?.detail || 'API error')
+    const error = new Error(data?.detail || 'API error')
+    error.status = res.status
+    throw error
   }
+
   return data
+}
+
+async function requestWithAuth(path, { method = 'GET', body, headers = {}, token, onTokenRefresh } = {}) {
+  try {
+    return await request(path, { method, body, headers, token })
+  } catch (error) {
+    if (error?.status === 401 && !['/auth/refresh', '/auth/login'].includes(path)) {
+      const refreshResponse = await refresh()
+      if (refreshResponse?.access_token) {
+        if (typeof onTokenRefresh === 'function') {
+          onTokenRefresh(refreshResponse.access_token)
+        }
+        return await request(path, {
+          method,
+          body,
+          headers,
+          token: refreshResponse.access_token,
+        })
+      }
+    }
+    throw error
+  }
 }
 
 export const api = {
   login: (payload) => request('/auth/login', { method: 'POST', body: payload }),
   register: (payload) => request('/auth/register', { method: 'POST', body: payload }),
-  refresh: (refresh_token) => request('/auth/refresh', { method: 'POST', body: { refresh_token } }),
-  logout: (refresh_token) => request('/auth/logout', { method: 'POST', body: { refresh_token } }),
-  getCurrentUser: (token) => request('/auth/me', { token }),
-  getSessions: (token) => request('/auth/sessions', { token }),
-  revokeSession: (sessionId, token) => request(`/auth/sessions/${sessionId}`, { method: 'DELETE', token }),
+  refresh: () => request('/auth/refresh', { method: 'POST' }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+
+  getCurrentUser: (token, onTokenRefresh) => requestWithAuth('/auth/me', { token, onTokenRefresh }),
+  getSessions: (token, onTokenRefresh) => requestWithAuth('/auth/sessions', { token, onTokenRefresh }),
+  revokeSession: (sessionId, token, onTokenRefresh) => requestWithAuth(`/auth/sessions/${sessionId}`, {
+    method: 'DELETE',
+    token,
+    onTokenRefresh,
+  }),
+  logoutAll: (token, onTokenRefresh) => requestWithAuth('/auth/sessions', {
+    method: 'DELETE',
+    token,
+    onTokenRefresh,
+  }),
+  revokeCurrentSession: (token, onTokenRefresh) => requestWithAuth('/auth/sessions/current', {
+    method: 'DELETE',
+    token,
+    onTokenRefresh,
+  }),
 }

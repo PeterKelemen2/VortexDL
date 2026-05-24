@@ -7,7 +7,7 @@ from app.models.refresh_token import RefreshToken
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.core.config import settings
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 from datetime import timedelta, datetime
@@ -194,24 +194,27 @@ async def register_user(user_in: UserRegister, db: AsyncSession):
 
     # Ensure roles exist
     role_names = {"admin": "Administrator role", "user": "Default user role"}
-    existing_roles = {}
+    stmt = select(Role).where(Role.name.in_(role_names.keys()))
+    result = await db.execute(stmt)
+    existing = {role.name: role for role in result.scalars().all()}
+
     for role_name, desc in role_names.items():
-        role_stmt = select(Role).where(Role.name == role_name)
-        role_result = await db.execute(role_stmt)
-        role = role_result.scalar_one_or_none()
-        if not role:
+        if role_name not in existing:
             role = Role(name=role_name, description=desc)
             db.add(role)
-            await db.commit()
+            existing[role_name] = role
+
+    if any(role.id is None for role in existing.values()):
+        await db.commit()
+        for role in existing.values():
             await db.refresh(role)
-        existing_roles[role_name] = role or await db.scalar(select(Role).where(Role.name == role_name))
 
     # Determine if this is the first user
     user_count = await db.scalar(select(sa.func.count()).select_from(User))
     if user_count == 0:
-        assigned_role = existing_roles["admin"]
+        assigned_role = existing["admin"]
     else:
-        assigned_role = existing_roles["user"]
+        assigned_role = existing["user"]
 
     hashed_pw = hash_password(user_in.password)
     user = User(
@@ -299,6 +302,9 @@ async def refresh_tokens(
 
 
 async def logout_refresh_token(token_req: TokenRefreshRequest, db: AsyncSession):
+    if not token_req.refresh_token:
+        return {"msg": "Logged out"}
+
     token_hash_val = hash_token(token_req.refresh_token)
     stmt = select(RefreshToken).where(
         RefreshToken.token_hash == token_hash_val,
@@ -310,6 +316,16 @@ async def logout_refresh_token(token_req: TokenRefreshRequest, db: AsyncSession)
         db_token.revoked = True
         await db.commit()
     return {"msg": "Logged out"}
+
+
+async def revoke_all_refresh_sessions(user: User, db: AsyncSession):
+    stmt = update(RefreshToken).where(
+        RefreshToken.user_id == user.id,
+        RefreshToken.revoked == False,
+    ).values(revoked=True)
+    await db.execute(stmt)
+    await db.commit()
+    return {"msg": "All sessions revoked"}
 
 
 async def list_refresh_sessions(db: AsyncSession, user: User, current_session_id: int | None = None):
