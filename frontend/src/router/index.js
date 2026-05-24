@@ -5,14 +5,15 @@ import HomeView from '@/views/HomeView.vue'
 import AdminView from '@/views/AdminView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import ForbiddenView from '@/views/ForbiddenView.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const routes = [
   { path: '/', name: 'home', component: HomeView, meta: { requiresAuth: true } },
   { path: '/admin', name: 'admin', component: AdminView, meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/not-found', name: 'not-found', component: NotFoundView },
   { path: '/forbidden', name: 'forbidden', component: ForbiddenView },
-  { path: '/register', name: 'register', component: RegisterView },
-  { path: '/login', name: 'login', component: LoginView },
+  { path: '/register', name: 'register', component: RegisterView, meta: { guestOnly: true } },
+  { path: '/login', name: 'login', component: LoginView, meta: { guestOnly: true } },
   { path: '/:pathMatch(.*)*', redirect: '/not-found' },
 ]
 
@@ -22,9 +23,12 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  const { useAuthStore } = await import('@/stores/auth')
   const auth = useAuthStore()
   await auth.init()
+
+  if (to.meta.guestOnly && auth.isAuthenticated) {
+    return { name: 'home' }
+  }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login' }
@@ -33,6 +37,8 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresAdmin && !auth.isAdmin) {
     return { name: 'forbidden' }
   }
+
+  return true
 })
 
 export default router

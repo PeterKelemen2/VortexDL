@@ -63,8 +63,8 @@ async function onLogin() {
         <button type="submit" :disabled="loading" class="btn w-full">
           {{ loading ? 'Logging in...' : 'Login' }}
         </button>
-        <div v-if="success" class="text-green-600 text-center font-medium">{{ success }}</div>
         <div v-if="error" class="text-red-600 text-center font-medium">{{ error }}</div>
+        <div v-if="success" class="text-green-600 text-center font-medium">{{ success }}</div>
         <div class="text-center mt-2">
           <router-link to="/register" class="text-blue-600 hover:underline"
             >Don't have an account? Register</router-link

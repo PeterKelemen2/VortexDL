@@ -44,6 +44,8 @@ export const useAuthStore = defineStore('auth', () => {
     const tokens = await api.login({ username, password })
     _setTokens(tokens.access_token, tokens.refresh_token)
     user.value = await api.getCurrentUser(accessToken.value)
+    initialized.value = true
+    initPromise = null
   }
 
   async function logout() {
