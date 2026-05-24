@@ -192,17 +192,7 @@ async def rotate_refresh_token(
     )
 
 
-async def register_user(user_in: UserRegister, db: AsyncSession):
-    # Check if user exists
-    if user_in.password != user_in.password_confirm:
-        raise HTTPException(status_code=400, detail="Passwords do not match")
-    
-    stmt = select(User).where(User.username == user_in.username)
-    result = await db.execute(stmt)
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Username already registered")
-
-    # Ensure roles exist
+async def ensure_roles_exist(db: AsyncSession) -> dict[str, Role]:
     role_names = {"admin": "Administrator role", "user": "Default user role"}
     stmt = select(Role).where(Role.name.in_(role_names.keys()))
     result = await db.execute(stmt)
@@ -219,12 +209,70 @@ async def register_user(user_in: UserRegister, db: AsyncSession):
         for role in existing.values():
             await db.refresh(role)
 
-    # Determine if this is the first user
-    user_count = await db.scalar(select(sa.func.count()).select_from(User))
-    if user_count == 0:
-        assigned_role = existing["admin"]
-    else:
-        assigned_role = existing["user"]
+    return existing
+
+
+async def bootstrap_initial_admin(db: AsyncSession):
+    username = settings.INITIAL_ADMIN_USERNAME
+    email = settings.INITIAL_ADMIN_EMAIL
+    password = settings.INITIAL_ADMIN_PASSWORD
+    force_elevate = settings.ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING
+
+    if bool(username or email or password) and not all((username, email, password)):
+        raise RuntimeError(
+            "INITIAL_ADMIN_USERNAME, INITIAL_ADMIN_EMAIL, and INITIAL_ADMIN_PASSWORD must all be set to bootstrap the initial admin account"
+        )
+
+    if not all((username, email, password)):
+        return
+
+    existing = await ensure_roles_exist(db)
+    admin_role = existing["admin"]
+
+    stmt = select(User).where(User.role_id == admin_role.id)
+    result = await db.execute(stmt)
+    admin_user = result.scalar_one_or_none()
+    if admin_user is not None:
+        return
+
+    stmt = select(User).where((User.username == username) | (User.email == email))
+    result = await db.execute(stmt)
+    existing_user = result.scalar_one_or_none()
+
+    if existing_user is not None:
+        if existing_user.role_id == admin_role.id:
+            return
+        if force_elevate:
+            existing_user.role_id = admin_role.id
+            await db.commit()
+        return
+
+    hashed_pw = hash_password(password)
+    user = User(
+        username=username,
+        email=email,
+        hashed_password=hashed_pw,
+        role_id=admin_role.id,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+
+async def register_user(user_in: UserRegister, db: AsyncSession):
+    # Check if user exists
+    if user_in.password != user_in.password_confirm:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+    
+    stmt = select(User).where(User.username == user_in.username)
+    result = await db.execute(stmt)
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Username already registered")
+
+    existing = await ensure_roles_exist(db)
+    assigned_role = existing["user"]
 
     hashed_pw = hash_password(user_in.password)
     user = User(

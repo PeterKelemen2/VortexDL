@@ -17,6 +17,10 @@ class Settings:
     JWT_ISSUER = os.getenv("JWT_ISSUER", "ytdlp_client")
     JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "ytdlp_client")
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+    INITIAL_ADMIN_USERNAME = os.getenv("INITIAL_ADMIN_USERNAME")
+    INITIAL_ADMIN_EMAIL = os.getenv("INITIAL_ADMIN_EMAIL")
+    INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD")
+    ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING = os.getenv("ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING", "false").lower() in ("1", "true", "yes")
     CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if origin.strip()]
 
 settings = Settings()
