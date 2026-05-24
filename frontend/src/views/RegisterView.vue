@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../utils/api'
 import { useAuthStore } from '@/stores/auth'
@@ -13,6 +13,70 @@ const error = ref('')
 const success = ref('')
 const showPassword = ref(false)
 const showPasswordConf = ref(false)
+
+const strengthCriteria = computed(() => {
+  const password = form.value.password || ''
+  const hasNumber = /\d/.test(password)
+  const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)
+  return [
+    { label: 'At least 12 characters', valid: password.length >= 12, mandatory: true },
+    { label: 'No spaces', valid: /^\S+$/.test(password), mandatory: true },
+    { label: 'An uppercase letter', valid: /[A-Z]/.test(password), mandatory: true },
+    { label: 'A lowercase letter', valid: /[a-z]/.test(password), mandatory: false },
+    { label: 'A number', valid: hasNumber, mandatory: false },
+    { label: 'A special character', valid: hasSpecial, mandatory: false },
+  ]
+})
+
+const passwordStrengthScore = computed(() => {
+  const password = form.value.password || ''
+  const lengthValid = password.length >= 12
+  const noSpacesValid = /^\S+$/.test(password)
+  const hasUppercase = /[A-Z]/.test(password)
+  const hasNumber = /\d/.test(password)
+  const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)
+
+  if (!lengthValid || !noSpacesValid || !hasUppercase) return 0
+  if (hasNumber && hasSpecial) return 3
+  if (hasNumber || hasSpecial) return 2
+  return 1
+})
+
+const passwordStrengthLabel = computed(() => {
+  const password = form.value.password || ''
+  if (!password) return 'Enter password'
+
+  const lengthValid = strengthCriteria.value[0].valid
+  const noSpacesValid = strengthCriteria.value[1].valid
+  const hasUppercase = strengthCriteria.value[2].valid
+  const hasNumber = strengthCriteria.value[4].valid
+  const hasSpecial = strengthCriteria.value[5].valid
+  const score = passwordStrengthScore.value
+
+  if (!lengthValid) return 'Too short'
+  if (!noSpacesValid) return 'No spaces allowed'
+  if (!hasUppercase) return 'Add an uppercase letter'
+  if (!hasNumber && !hasSpecial) return 'Add a number or special character'
+  if (score === 1) return 'Weak'
+  if (score === 2) return 'Acceptable'
+  return 'Strong'
+})
+
+const mandatoryCriteria = computed(() => strengthCriteria.value.filter((item) => item.mandatory))
+const isPasswordValid = computed(
+  () => mandatoryCriteria.value.every((item) => item.valid) && passwordStrengthScore.value >= 2,
+)
+const canSubmit = computed(() => {
+  return (
+    !loading.value &&
+    form.value.username &&
+    form.value.email &&
+    form.value.password &&
+    form.value.password_confirm &&
+    form.value.password === form.value.password_confirm &&
+    isPasswordValid.value
+  )
+})
 
 async function getDeviceData() {
   const userAgent = navigator.userAgent || undefined
@@ -46,7 +110,12 @@ async function onRegister() {
     }
     await api.register(form.value)
     const deviceData = await getDeviceData()
-    await auth.login(form.value.username, form.value.password, deviceData.deviceName, deviceData.userAgent)
+    await auth.login(
+      form.value.username,
+      form.value.password,
+      deviceData.deviceName,
+      deviceData.userAgent,
+    )
     success.value = 'Registration successful! Redirecting...'
     await new Promise((resolve) => setTimeout(resolve, 1000))
     await router.push('/')
@@ -92,6 +161,44 @@ async function onRegister() {
               <component :is="showPassword ? EyeOff : Eye" class="w-5 h-5" />
             </button>
           </div>
+          <div class="mt-3">
+            <div class="flex items-center justify-between text-sm text-gray-600 mb-1">
+              <span>Password strength</span>
+              <span
+                class="font-semibold transition-colors"
+                :class="{
+                  'text-red-600': !isPasswordValid,
+                  'text-green-600': isPasswordValid,
+                }"
+                >{{ passwordStrengthLabel }}</span
+              >
+            </div>
+            <div
+              class="h-2 w-full border border-slate-300 bg-slate-200 rounded-full overflow-hidden"
+            >
+              <div
+                class="h-full rounded-full transition-all"
+                :style="{
+                  width: `${(passwordStrengthScore / 3) * 100}%`,
+                  backgroundColor: isPasswordValid
+                    ? '#16a34a'
+                    : passwordStrengthScore === 2
+                      ? '#eab308'
+                      : '#ef4444',
+                }"
+              />
+            </div>
+            <ul class="mt-2 space-y-1 text-xs text-gray-600">
+              <li
+                v-for="(rule, index) in strengthCriteria"
+                :key="index"
+                :class="rule.valid ? 'text-green-700' : 'text-gray-500'"
+              >
+                <span class="mr-2" :aria-hidden="true">{{ rule.valid ? '✓' : '•' }}</span>
+                {{ rule.label }}
+              </li>
+            </ul>
+          </div>
         </div>
         <div>
           <label class="block text-gray-700 mb-1 font-medium">Confirm Password</label>
@@ -114,7 +221,7 @@ async function onRegister() {
           </div>
         </div>
 
-        <button type="submit" :disabled="loading" class="btn w-full">
+        <button type="submit" :disabled="!canSubmit" class="btn w-full">
           {{ loading ? 'Registering...' : 'Register' }}
         </button>
         <div v-if="success" class="text-green-600 text-center font-medium">{{ success }}</div>

@@ -4,6 +4,8 @@ from app.schemas.auth import TokenResponse, TokenRefreshRequest
 from app.models.role import Role
 from app.models.user import User
 from app.models.refresh_token import RefreshToken
+import logging
+
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.core.config import settings
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +20,10 @@ import socket
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 14
+PASSWORD_MIN_LENGTH = 12
+PASSWORD_SPECIAL_RE = re.compile(r"[!@#$%^&*()_+\-=[\]{};':\"\\|,.<>/?]")
+
+logger = logging.getLogger(__name__)
 
 
 def hash_token(token: str) -> str:
@@ -212,6 +218,26 @@ async def ensure_roles_exist(db: AsyncSession) -> dict[str, Role]:
     return existing
 
 
+def validate_password_strength(password: str) -> None:
+    errors: list[str] = []
+    if len(password) < PASSWORD_MIN_LENGTH:
+        errors.append(f"at least {PASSWORD_MIN_LENGTH} characters")
+    if " " in password:
+        errors.append("no spaces")
+    if not re.search(r"[A-Z]", password):
+        errors.append("an uppercase letter")
+    if not (re.search(r"\d", password) or PASSWORD_SPECIAL_RE.search(password)):
+        errors.append("a digit or a special character")
+
+    if errors:
+        raise HTTPException(
+            status_code=400,
+            detail=("Password must contain " + ", ".join(errors[:-1]) + " and " + errors[-1])
+            if len(errors) > 1
+            else f"Password must contain {errors[0]}"
+        )
+
+
 async def bootstrap_initial_admin(db: AsyncSession):
     username = settings.INITIAL_ADMIN_USERNAME
     email = settings.INITIAL_ADMIN_EMAIL
@@ -224,6 +250,7 @@ async def bootstrap_initial_admin(db: AsyncSession):
         )
 
     if not all((username, email, password)):
+        logger.debug("Admin bootstrap skipped because initial admin credentials are incomplete")
         return
 
     existing = await ensure_roles_exist(db)
@@ -233,6 +260,7 @@ async def bootstrap_initial_admin(db: AsyncSession):
     result = await db.execute(stmt)
     admin_user = result.scalar_one_or_none()
     if admin_user is not None:
+        logger.debug("Admin bootstrap skipped because an admin account already exists: %s", admin_user.username)
         return
 
     stmt = select(User).where((User.username == username) | (User.email == email))
@@ -241,11 +269,21 @@ async def bootstrap_initial_admin(db: AsyncSession):
 
     if existing_user is not None:
         if existing_user.role_id == admin_role.id:
+            logger.debug("Existing account %s already has admin privileges", existing_user.username)
             return
         if force_elevate:
             existing_user.role_id = admin_role.id
             await db.commit()
+            logger.info("Elevated existing user %s to admin via bootstrap", existing_user.username)
+        else:
+            logger.info("Admin bootstrap found existing user %s but did not elevate; set ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING=true to promote", existing_user.username)
         return
+
+    try:
+        validate_password_strength(password)
+    except HTTPException as exc:
+        logger.error("Initial admin bootstrap failed: %s", exc.detail)
+        raise RuntimeError(exc.detail)
 
     hashed_pw = hash_password(password)
     user = User(
@@ -259,12 +297,15 @@ async def bootstrap_initial_admin(db: AsyncSession):
     db.add(user)
     await db.commit()
     await db.refresh(user)
+    logger.info("Created initial admin account %s via bootstrap", username)
 
 
 async def register_user(user_in: UserRegister, db: AsyncSession):
-    # Check if user exists
+    # Check if passwords match and are strong enough
     if user_in.password != user_in.password_confirm:
         raise HTTPException(status_code=400, detail="Passwords do not match")
+
+    validate_password_strength(user_in.password)
     
     stmt = select(User).where(User.username == user_in.username)
     result = await db.execute(stmt)
