@@ -1,6 +1,6 @@
 import bcrypt as _bcrypt
 from jose import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
 import base64
 import secrets
@@ -33,7 +33,7 @@ def create_access_token(
     algorithm: str = "HS256",
 ) -> str:
     to_encode = data.copy()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     expire = now + expires_delta
     to_encode.update({"exp": expire, "iat": now, "nbf": now})
     if issuer is not None:

@@ -1,7 +1,7 @@
 import asyncio
 import hashlib
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from httpx import AsyncClient
 
 from sqlalchemy import select
@@ -63,8 +63,8 @@ async def create_admin_user(username="adminuser", email="admin@example.com", pas
                 email=email,
                 hashed_password=hash_password(password),
                 role_id=admin_role.id,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
             )
             session.add(user)
             await session.commit()
@@ -157,7 +157,7 @@ async def test_refresh_with_expired_cookie_returns_401(client):
             result = await session.execute(stmt)
             token = result.scalar_one_or_none()
             assert token is not None
-            token.expires_at = datetime.utcnow()
+            token.expires_at = datetime.now(timezone.utc)
             await session.commit()
 
     await expire_token()

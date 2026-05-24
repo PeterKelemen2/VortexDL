@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.config import settings
 from app.models.user import User
 from app.models.refresh_token import RefreshToken
@@ -48,7 +48,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
             RefreshToken.id == session_id,
             RefreshToken.user_id == int(user_id),
             RefreshToken.revoked == False,
-            RefreshToken.expires_at > datetime.utcnow(),
+            RefreshToken.expires_at > datetime.now(timezone.utc),
         )
         token_result = await db.execute(token_stmt)
         refresh_session = token_result.scalar_one_or_none()

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
 class TokenResponse(BaseModel):
@@ -19,5 +19,4 @@ class RefreshTokenSession(BaseModel):
     expires_at: datetime
     current: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

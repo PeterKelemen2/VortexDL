@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 import asyncio
 import hashlib
 import re
@@ -24,6 +24,14 @@ PASSWORD_MIN_LENGTH = 12
 PASSWORD_SPECIAL_RE = re.compile(r"[!@#$%^&*()_+\-=[\]{};':\"\\|,.<>/?]")
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_utc(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def hash_token(token: str) -> str:
@@ -131,7 +139,7 @@ async def create_tokens(
 ):
     raw_refresh = create_refresh_token()
     token_hash = hash_token(raw_refresh)
-    expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
     if device_os is None:
         device_os = detect_device_os(user_agent)
@@ -291,8 +299,8 @@ async def bootstrap_initial_admin(db: AsyncSession):
         email=email,
         hashed_password=hashed_pw,
         role_id=admin_role.id,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
     db.add(user)
     await db.commit()
@@ -329,8 +337,8 @@ async def register_user(user_in: UserRegister, db: AsyncSession):
         email=email,
         hashed_password=hashed_pw,
         role_id=assigned_role.id,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
     db.add(user)
     await db.commit()
@@ -390,7 +398,7 @@ async def refresh_tokens(
         )
         result = await db.execute(stmt)
         db_token = result.scalar_one_or_none()
-        if not db_token or db_token.expires_at < datetime.utcnow():
+        if not db_token or _ensure_utc(db_token.expires_at) < datetime.now(timezone.utc):
             raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
         # FIX: load user with role eagerly to avoid lazy-load issues
@@ -400,7 +408,7 @@ async def refresh_tokens(
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
 
-        db_token.last_used_at = datetime.utcnow()
+        db_token.last_used_at = datetime.now(timezone.utc)
         await db.commit()
         access_token, new_refresh = await rotate_refresh_token(
             db,
@@ -445,7 +453,7 @@ async def list_refresh_sessions(db: AsyncSession, user: User, current_session_id
     stmt = select(RefreshToken).where(
         RefreshToken.user_id == user.id,
         RefreshToken.revoked == False,
-        RefreshToken.expires_at > datetime.utcnow(),
+        RefreshToken.expires_at > datetime.now(timezone.utc),
     )
     result = await db.execute(stmt)
     sessions = result.scalars().all()
