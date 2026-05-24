@@ -523,6 +523,31 @@ async def test_revoke_current_session_invalidates_access_token(client):
     assert me_response.status_code == 401
 
 
+async def test_revoke_current_session_without_active_session_returns_400(client):
+    register_response = await client.post("/auth/register", json=register_payload())
+    user_id = register_response.json()["id"]
+    token = create_access_token(
+        data={"sub": str(user_id), "role": "user"},
+        secret=settings.JWT_SECRET,
+        expires_delta=timedelta(minutes=15),
+        issuer=settings.JWT_ISSUER,
+        audience=settings.JWT_AUDIENCE,
+        algorithm=settings.JWT_ALGORITHM,
+    )
+
+    client.cookies.set("csrf_token", "test-csrf", path="/")
+    response = await client.delete(
+        "/auth/sessions/current",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": "test-csrf",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json().get("detail") == "No active session to revoke"
+
+
 async def test_sessions_endpoint_returns_current_session_flag(client):
     await client.post("/auth/register", json=register_payload())
     login_response = await client.post("/auth/login", json=login_payload())
