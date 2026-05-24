@@ -11,7 +11,7 @@ class TokenRefreshRequest(BaseModel):
 
 class RefreshTokenSession(BaseModel):
     id: int
-    device_os: str | None
+    resolved_name: str | None
     device_name: str | None
     user_agent: str | None
     created_at: datetime

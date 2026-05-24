@@ -12,7 +12,10 @@ const error = ref('')
 const success = ref('')
 const showPassword = ref(false)
 
-async function getDeviceName() {
+async function getDeviceData() {
+  const userAgent = navigator.userAgent || undefined
+  let deviceName = navigator.userAgentData?.platform || navigator.platform || undefined
+
   if (navigator.userAgentData?.getHighEntropyValues) {
     try {
       const data = await navigator.userAgentData.getHighEntropyValues([
@@ -21,10 +24,14 @@ async function getDeviceName() {
         'model',
       ])
       const parts = [data.platform, data.platformVersion, data.model].filter(Boolean)
-      if (parts.length) return parts.join(' ')
-    } catch { /* browser denied or API not supported */ }
+      if (parts.length) deviceName = parts.join(' ')
+    } catch (error) {
+      console.debug('[auth] high-entropy hints unavailable', error)
+    }
   }
-  return navigator.platform || navigator.userAgent || undefined
+
+  console.debug('[auth] device data', { deviceName, userAgent })
+  return { deviceName, userAgent }
 }
 
 async function onLogin() {
@@ -32,7 +39,8 @@ async function onLogin() {
   error.value = ''
   success.value = ''
   try {
-    await auth.login(form.value.username, form.value.password, await getDeviceName())
+    const deviceData = await getDeviceData()
+    await auth.login(form.value.username, form.value.password, deviceData.deviceName, deviceData.userAgent)
     success.value = 'Login successful! Redirecting...'
     await new Promise((resolve) => setTimeout(resolve, 1000))
     await router.push('/')

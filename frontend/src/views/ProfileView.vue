@@ -47,10 +47,14 @@ onMounted(loadSessions)
       >
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p class="text-lg font-semibold text-gray-900">
-              {{ session.device_name || 'Unknown device' }}
-            </p>
-            <p class="text-sm text-gray-500">{{ session.device_os || 'Unknown OS' }}</p>
+            <div class="flex items-center gap-4">
+              <p class="text-lg font-semibold text-gray-900">
+                {{ session.resolved_name || 'Unknown host' }}
+              </p>
+              <p class="text-sm text-gray-500">
+                {{ session.device_name || 'Unknown device' }}
+              </p>
+            </div>
           </div>
           <div class="text-sm text-gray-500 text-right">
             <p>Created: {{ new Date(session.created_at).toLocaleString() }}</p>

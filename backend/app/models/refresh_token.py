@@ -14,6 +14,7 @@ class RefreshToken(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    resolved_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     device_os: Mapped[str | None] = mapped_column(String(32), nullable=True)
     device_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(1024), nullable=True)

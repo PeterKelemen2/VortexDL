@@ -1,3 +1,4 @@
+from typing import Any
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
@@ -7,6 +8,7 @@ class UserBase(BaseModel):
 class UserLogin(UserBase):
     password: str
     device_name: str | None = None
+    user_agent: str | None = None
 
 class UserRegister(UserLogin):
     email: EmailStr

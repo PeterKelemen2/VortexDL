@@ -119,6 +119,7 @@ async def create_tokens(
     session: AsyncSession,
     user: User,
     device_name: str | None = None,
+    resolved_name: str | None = None,
     device_os: str | None = None,
     user_agent: str | None = None,
 ):
@@ -134,17 +135,29 @@ async def create_tokens(
     if device_os is None:
         device_os = detect_device_os(user_agent)
 
-    # UA parsing is more accurate than what the browser reports via navigator.platform;
-    # only keep the frontend-supplied name if UA parsing produces nothing.
-    ua_name = detect_device_name(user_agent)
-    if ua_name:
-        device_name = ua_name
-    elif device_name is None:
-        device_name = device_os
+    # Prefer the browser-supplied device name when available.
+    parsed_name = detect_device_name(user_agent)
+    if device_name is not None:
+        normalized = device_name.strip().lower()
+        generic = normalized in {
+            'linux',
+            'linux x86_64',
+            'linux armv8',
+            'linux arm64',
+            'android',
+            'ios',
+            'macos',
+            'windows',
+        }
+        if generic and parsed_name:
+            device_name = parsed_name
+    if device_name is None:
+        device_name = parsed_name or device_os
 
     refresh_token = RefreshToken(
         user_id=user.id,
         token_hash=token_hash,
+        resolved_name=resolved_name,
         device_os=device_os,
         device_name=device_name,
         user_agent=user_agent[:1024] if user_agent else None,
@@ -225,20 +238,28 @@ async def refresh_tokens(
     data,
     db: AsyncSession,
     device_name: str | None = None,
-    device_os: str | None = None,
     user_agent: str | None = None,
+    device_os: str | None = None,
     client_ip: str | None = None,
 ):
     if isinstance(data, UserLogin):
         user = await authenticate_user(db, data.username, data.password)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
-        # Prefer explicit device_name, then reverse DNS hostname, then UA-derived name
-        resolved_name = device_name or (await resolve_hostname(client_ip))
+
+        resolved_name = await resolve_hostname(client_ip)
+        print('[auth] refresh_tokens login', {
+            'username': data.username,
+            'client_ip': client_ip,
+            'received_device_name': data.device_name,
+            'resolved_name': resolved_name,
+            'user_agent': user_agent,
+        })
         access_token, refresh_token = await create_tokens(
             db,
             user,
-            device_name=resolved_name,
+            device_name=data.device_name,
+            resolved_name=resolved_name,
             device_os=device_os,
             user_agent=user_agent,
         )
