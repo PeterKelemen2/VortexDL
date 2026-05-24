@@ -28,4 +28,6 @@ export const api = {
   refresh: (refresh_token) => request('/auth/refresh', { method: 'POST', body: { refresh_token } }),
   logout: (refresh_token) => request('/auth/logout', { method: 'POST', body: { refresh_token } }),
   getCurrentUser: (token) => request('/auth/me', { token }),
+  getSessions: (token) => request('/auth/sessions', { token }),
+  revokeSession: (sessionId, token) => request(`/auth/sessions/${sessionId}`, { method: 'DELETE', token }),
 }

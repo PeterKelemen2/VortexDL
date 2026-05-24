@@ -35,9 +35,13 @@ async function onLogout() {
           Admin
         </router-link>
 
-        <span class="text-sm text-gray-500 hidden sm:block">
-          {{ auth.user?.username }}
-        </span>
+        <router-link
+          v-if="auth.user?.username"
+          to="/profile"
+          class="text-sm text-gray-500 inline-flex hover:text-blue-700 transition-colors"
+        >
+          {{ auth.user.username }}
+        </router-link>
 
         <button
           @click="onLogout"
