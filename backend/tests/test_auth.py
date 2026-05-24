@@ -1,3 +1,14 @@
+import asyncio
+from datetime import datetime
+
+from sqlalchemy import select
+
+from app.core.db import async_session
+from app.core.security import hash_password
+from app.models.role import Role
+from app.models.user import User
+
+
 def register_payload(username="testuser", email="test@example.com", password="Password123!"):
     return {
         "username": username,
@@ -19,6 +30,34 @@ def csrf_header(client):
 def assert_validation_error(response, message):
     assert response.status_code == 400
     assert response.json().get("detail") == message
+
+
+def create_admin_user(username="adminuser", email="admin@example.com", password="Admin123!"):
+    async def _create():
+        async with async_session() as session:
+            role_stmt = select(Role).where(Role.name == "admin")
+            role_result = await session.execute(role_stmt)
+            admin_role = role_result.scalar_one_or_none()
+            if admin_role is None:
+                admin_role = Role(name="admin", description="Administrator role")
+                session.add(admin_role)
+                await session.commit()
+                await session.refresh(admin_role)
+
+            user = User(
+                username=username,
+                email=email,
+                hashed_password=hash_password(password),
+                role_id=admin_role.id,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+            return user
+
+    return asyncio.run(_create())
 
 
 def test_register_login_refresh_logout_flow(client):
@@ -61,6 +100,50 @@ def test_register_login_refresh_logout_flow(client):
         headers=csrf_header(client),
     )
     assert refresh_after_logout.status_code in (401, 403)
+
+
+def test_refresh_rotates_and_revokes_old_refresh_token(client):
+    client.post("/auth/register", json=register_payload())
+    client.post("/auth/login", json=login_payload())
+    old_refresh_token = client.cookies.get("refresh_token")
+    assert old_refresh_token is not None
+
+    refresh_response = client.post("/auth/refresh", headers=csrf_header(client))
+    assert refresh_response.status_code == 200
+    new_refresh_token = client.cookies.get("refresh_token")
+    assert new_refresh_token is not None
+    assert new_refresh_token != old_refresh_token
+
+    client.cookies.set("refresh_token", old_refresh_token, path="/auth")
+    stale_refresh_response = client.post("/auth/refresh", headers=csrf_header(client))
+    assert stale_refresh_response.status_code == 401
+
+
+def test_admin_route_restricts_non_admin_users(client):
+    client.post("/auth/register", json=register_payload())
+    login_response = client.post("/auth/login", json=login_payload())
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        "/admin/users",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_admin_route_allows_admin_users(client):
+    create_admin_user()
+    login_response = client.post("/auth/login", json=login_payload(username="adminuser", password="Admin123!"))
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        "/admin/users",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 200
+    users = response.json()
+    assert isinstance(users, list)
+    assert any(user["username"] == "adminuser" for user in users)
 
 
 def test_register_duplicate_username_and_email(client):
