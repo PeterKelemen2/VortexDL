@@ -421,6 +421,81 @@ def test_refresh_requires_csrf_token(client):
     assert response.json().get("detail") == "Invalid CSRF token"
 
 
+def test_refresh_with_invalid_refresh_cookie_returns_401(client):
+    client.post("/auth/register", json=register_payload())
+    client.post("/auth/login", json=login_payload())
+    csrf_token = client.cookies.get("csrf_token")
+    client.cookies.set("refresh_token", "invalidtoken", path="/auth")
+    response = client.post("/auth/refresh", headers={"X-CSRF-Token": csrf_token})
+    assert response.status_code == 401
+
+
+def test_revoke_all_sessions_invalidates_access_token(client):
+    client.post("/auth/register", json=register_payload())
+    login1 = client.post("/auth/login", json=login_payload())
+    access_token1 = login1.json()["access_token"]
+    client.post("/auth/refresh", headers=csrf_header(client))
+    login2 = client.post("/auth/login", json=login_payload())
+    access_token2 = login2.json()["access_token"]
+
+    revoke_response = client.delete(
+        "/auth/sessions",
+        headers={
+            **csrf_header(client),
+            "Authorization": f"Bearer {access_token2}",
+        },
+    )
+    assert revoke_response.status_code == 204
+
+    # Old token is now invalid because its refresh session was revoked.
+    me_response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {access_token1}"},
+    )
+    assert me_response.status_code == 401
+
+
+def test_get_current_user_with_token_without_sid_returns_200(client):
+    register_response = client.post("/auth/register", json=register_payload())
+    user_id = register_response.json()["id"]
+    token = create_access_token(
+        data={"sub": str(user_id), "role": "user"},
+        secret=settings.JWT_SECRET,
+        expires_delta=timedelta(minutes=15),
+        issuer=settings.JWT_ISSUER,
+        audience=settings.JWT_AUDIENCE,
+        algorithm=settings.JWT_ALGORITHM,
+    )
+    response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+
+
+def test_get_current_user_with_invalid_sid_returns_401(client):
+    register_response = client.post("/auth/register", json=register_payload())
+    user_id = register_response.json()["id"]
+    payload = create_access_token(
+        data={"sub": str(user_id), "role": "user", "sid": 999999},
+        secret=settings.JWT_SECRET,
+        expires_delta=timedelta(minutes=15),
+        issuer=settings.JWT_ISSUER,
+        audience=settings.JWT_AUDIENCE,
+        algorithm=settings.JWT_ALGORITHM,
+    )
+    response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {payload}"},
+    )
+    assert response.status_code == 401
+
+
+def test_health_endpoint_returns_200(client):
+    response = client.get("/health")
+    assert response.status_code == 200
+
+
 def test_revoke_current_session_invalidates_access_token(client):
     client.post("/auth/register", json=register_payload())
     login_response = client.post("/auth/login", json=login_payload())
