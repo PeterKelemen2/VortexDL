@@ -1,6 +1,7 @@
 import socket
 import pytest
 from datetime import datetime, timedelta, timezone
+from fastapi import HTTPException
 from sqlalchemy import select, text
 from sqlalchemy.orm import selectinload
 
@@ -27,6 +28,7 @@ from app.services.auth_service import (
     refresh_tokens,
     authenticate_user,
     logout_refresh_token,
+    revoke_all_refresh_sessions,
     list_refresh_sessions,
     revoke_refresh_session,
     get_user_info,
@@ -325,6 +327,375 @@ async def test_logout_refresh_token_revokes_token():
         stmt = select(RefreshToken).where(RefreshToken.token_hash == hash_token(raw_refresh))
         db_token = (await session.execute(stmt)).scalar_one()
         assert db_token.revoked is True
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_initial_admin_skips_when_no_credentials(monkeypatch):
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_USERNAME", "")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_EMAIL", "")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_PASSWORD", "")
+    monkeypatch.setattr(settings, "ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING", False)
+
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        result = await bootstrap_initial_admin(session)
+        assert result is None
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_initial_admin_skips_when_admin_already_exists(monkeypatch):
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_USERNAME", "bootstrapadmin")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_EMAIL", "bootstrap@example.com")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_PASSWORD", "Password123!")
+    monkeypatch.setattr(settings, "ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING", False)
+
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        existing_roles = await ensure_roles_exist(session)
+        admin_role = existing_roles["admin"]
+        user = User(
+            username="alreadyadmin",
+            email="alreadyadmin@example.com",
+            hashed_password=hash_password("Password123!"),
+            role_id=admin_role.id,
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+        await bootstrap_initial_admin(session)
+
+        stmt = select(User).where(User.username == "alreadyadmin")
+        result = await session.execute(stmt)
+        admin_user = result.scalar_one_or_none()
+        assert admin_user is not None
+        assert admin_user.role_id == admin_role.id
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_initial_admin_does_not_elevate_existing_user_without_force(monkeypatch):
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_USERNAME", "bootstrapadmin")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_EMAIL", "bootstrap@example.com")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_PASSWORD", "Password123!")
+    monkeypatch.setattr(settings, "ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING", False)
+
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        existing_roles = await ensure_roles_exist(session)
+        user_role = existing_roles["user"]
+        user = User(
+            username="bootstrapadmin",
+            email="bootstrap@example.com",
+            hashed_password=hash_password("Password123!"),
+            role_id=user_role.id,
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+        await bootstrap_initial_admin(session)
+
+        stmt = select(User).where(User.username == "bootstrapadmin")
+        result = await session.execute(stmt)
+        persisted = result.scalar_one_or_none()
+        assert persisted is not None
+        assert persisted.role_id == user_role.id
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_initial_admin_raises_for_weak_password(monkeypatch):
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_USERNAME", "bootstrapadmin")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_EMAIL", "bootstrap@example.com")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_PASSWORD", "weakpass")
+    monkeypatch.setattr(settings, "ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING", False)
+
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        with pytest.raises(RuntimeError) as exc_info:
+            await bootstrap_initial_admin(session)
+
+        assert "Password must contain" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_initial_admin_elevates_existing_user_when_force_elevate_set(monkeypatch):
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_USERNAME", "bootstrapadmin")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_EMAIL", "bootstrap@example.com")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_PASSWORD", "Password123!")
+    monkeypatch.setattr(settings, "ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING", True)
+
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        existing_roles = await ensure_roles_exist(session)
+        user_role = existing_roles["user"]
+        user = User(
+            username="bootstrapadmin",
+            email="bootstrap@example.com",
+            hashed_password=hash_password("Password123!"),
+            role_id=user_role.id,
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+        await bootstrap_initial_admin(session)
+
+        stmt = select(User).where(User.username == "bootstrapadmin")
+        result = await session.execute(stmt)
+        persisted = result.scalar_one_or_none()
+        assert persisted is not None
+        assert persisted.role_id == existing_roles["admin"].id
+
+
+@pytest.mark.asyncio
+async def test_resolve_hostname_returns_short_hostname(monkeypatch):
+    def fake_gethostbyaddr(ip):
+        return ("example.domain.com", [], ["127.0.0.1"])
+
+    monkeypatch.setattr("socket.gethostbyaddr", fake_gethostbyaddr)
+    assert await resolve_hostname("8.8.8.8") == "example"
+
+
+@pytest.mark.asyncio
+async def test_register_user_service_rejects_duplicate_username():
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        existing_roles = await ensure_roles_exist(session)
+        user_role = existing_roles["user"]
+        user = User(
+            username="serviceuser",
+            email="serviceuser@example.com",
+            hashed_password=hash_password("Password123!"),
+            role_id=user_role.id,
+        )
+        session.add(user)
+        await session.commit()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await register_user(
+                UserRegister(
+                    username="serviceuser",
+                    email="unique@example.com",
+                    password="Password123!",
+                    password_confirm="Password123!",
+                    device_name=None,
+                    user_agent=None,
+                ),
+                session,
+            )
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == "Username already registered"
+
+
+@pytest.mark.asyncio
+async def test_register_user_service_rejects_duplicate_email():
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        existing_roles = await ensure_roles_exist(session)
+        user_role = existing_roles["user"]
+        user = User(
+            username="uniqueuser",
+            email="duplicate@example.com",
+            hashed_password=hash_password("Password123!"),
+            role_id=user_role.id,
+        )
+        session.add(user)
+        await session.commit()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await register_user(
+                UserRegister(
+                    username="anotheruser",
+                    email="duplicate@example.com",
+                    password="Password123!",
+                    password_confirm="Password123!",
+                    device_name=None,
+                    user_agent=None,
+                ),
+                session,
+            )
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == "Email already registered"
+
+
+@pytest.mark.asyncio
+async def test_refresh_tokens_uses_user_login_path_and_resolves_hostname(monkeypatch):
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        existing_roles = await ensure_roles_exist(session)
+        user = User(
+            username="loginservice",
+            email="loginservice@example.com",
+            hashed_password=hash_password("Password123!"),
+            role_id=existing_roles["user"].id,
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+        async def fake_resolve_hostname(ip):
+            return "test-host"
+
+        monkeypatch.setattr("app.services.auth_service.resolve_hostname", fake_resolve_hostname)
+        token_resp = await refresh_tokens(
+            UserLogin(username="loginservice", password="Password123!"),
+            session,
+            user_agent="Mozilla/5.0 (Linux; Android 15; Pixel 8)",
+            client_ip="8.8.8.8",
+        )
+
+        assert token_resp.access_token
+        assert token_resp.refresh_token
+
+
+@pytest.mark.asyncio
+async def test_refresh_tokens_with_missing_refresh_token_raises_401():
+    async with async_session() as session:
+        with pytest.raises(HTTPException) as exc_info:
+            await refresh_tokens(TokenRefreshRequest(refresh_token=None), session)
+
+        assert exc_info.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_refresh_tokens_user_not_found_raises_401():
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM refresh_tokens"))
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        raw_refresh = "unknown-user"
+        await session.execute(text("PRAGMA foreign_keys = OFF"))
+        await session.execute(
+            text(
+                "INSERT INTO refresh_tokens (user_id, token_hash, expires_at, revoked, created_at) VALUES (:user_id, :token_hash, :expires_at, 0, :created_at)"
+            ),
+            {
+                "user_id": 999999,
+                "token_hash": hash_token(raw_refresh),
+                "expires_at": (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(sep=" "),
+                "created_at": datetime.now(timezone.utc).isoformat(sep=" "),
+            },
+        )
+        await session.commit()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await refresh_tokens(TokenRefreshRequest(refresh_token=raw_refresh), session)
+
+        assert exc_info.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_refresh_tokens_invalid_request_object_raises_400():
+    async with async_session() as session:
+        with pytest.raises(HTTPException) as exc_info:
+            await refresh_tokens(object(), session)
+
+        assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_revoke_all_refresh_sessions_revokes_tokens():
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM refresh_tokens"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        existing_roles = await ensure_roles_exist(session)
+        user = User(
+            username="revokeall",
+            email="revokeall@example.com",
+            hashed_password=hash_password("Password123!"),
+            role_id=existing_roles["user"].id,
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+        token1 = RefreshToken(
+            user_id=user.id,
+            token_hash=hash_token("one"),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            revoked=False,
+        )
+        token2 = RefreshToken(
+            user_id=user.id,
+            token_hash=hash_token("two"),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            revoked=False,
+        )
+        session.add_all([token1, token2])
+        await session.commit()
+
+        await revoke_all_refresh_sessions(user, session)
+
+        stmt = select(RefreshToken).where(RefreshToken.user_id == user.id)
+        refreshed = (await session.execute(stmt)).scalars().all()
+        assert all(token.revoked for token in refreshed)
+
+
+@pytest.mark.asyncio
+async def test_revoke_refresh_session_revokes_valid_session():
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM refresh_tokens"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        existing_roles = await ensure_roles_exist(session)
+        user = User(
+            username="revokesession",
+            email="revokesession@example.com",
+            hashed_password=hash_password("Password123!"),
+            role_id=existing_roles["user"].id,
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+        refresh_token = RefreshToken(
+            user_id=user.id,
+            token_hash=hash_token("revoke-me"),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            revoked=False,
+        )
+        session.add(refresh_token)
+        await session.commit()
+        await session.refresh(refresh_token)
+
+        response = await revoke_refresh_session(refresh_token.id, user, session)
+        assert response["msg"] == "Session revoked"
+
+        await session.refresh(refresh_token)
+        assert refresh_token.revoked is True
 
 
 @pytest.mark.asyncio
