@@ -8,8 +8,20 @@ const router = useRouter()
 const route = useRoute()
 
 const menuItems = [
-  { id: 'account', label: 'Account', route: 'profile', query: { tab: 'account' } },
-  { id: 'security', label: 'Security', route: 'profile', query: { tab: 'security' } },
+  {
+    id: 'account',
+    label: 'Account',
+    route: 'profile',
+    query: { tab: 'account' },
+    component: AccountSettings,
+  },
+  {
+    id: 'security',
+    label: 'Security',
+    route: 'profile',
+    query: { tab: 'security' },
+    component: SecuritySettings,
+  },
 ]
 
 const selectedItem = computed(() => {
@@ -33,7 +45,10 @@ function selectMenuItem(item) {
             v-for="item in menuItems"
             :key="item.id"
             @click="selectMenuItem(item)"
-            class="w-full rounded-lg px-3 py-2 text-left font-medium transition hover:bg-blue-50 hover:text-blue-700"
+            :class="[
+              'w-full rounded-lg px-3 py-2 text-left font-medium transition hover:bg-blue-50 hover:text-blue-700 active:bg-blue-200',
+              { 'bg-blue-100 text-blue-700': selectedTab === item.id },
+            ]"
           >
             {{ item.label }}
           </button>
@@ -45,9 +60,7 @@ function selectMenuItem(item) {
           <h1>{{ selectedItem.label }} settings</h1>
         </div>
 
-        <AccountSettings v-if="selectedTab === 'account'" />
-
-        <SecuritySettings v-else />
+        <component :is="selectedItem.component" />
       </main>
     </div>
   </div>
