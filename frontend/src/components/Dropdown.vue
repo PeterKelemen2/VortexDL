@@ -25,8 +25,9 @@ const props = defineProps({
         const hasHoverClass = item.hoverClass === undefined || typeof item.hoverClass === 'string'
         const hasAction =
           item.action === undefined ||
-          typeof item.action === 'string' ||
-          typeof item.action === 'function'
+          typeof item.action === 'function' ||
+          typeof item.action === 'string'
+        const hasCommand = item.route || item.action
 
         return (
           hasLabel &&
@@ -36,7 +37,8 @@ const props = defineProps({
           hasTextClass &&
           hasBgClass &&
           hasHoverClass &&
-          hasAction
+          hasAction &&
+          hasCommand
         )
       })
     },
@@ -74,7 +76,7 @@ function navigate(item) {
     return
   }
 
-  if (item.route && item.route !== 'logout') {
+  if (item.route) {
     router.push({ name: item.route, query: item.query ?? {} })
   }
 }
