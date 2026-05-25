@@ -22,6 +22,23 @@ const pageKey = ref(0)
 const initialPageLoad = ref(true)
 const pageSizeOptions = [5, 10, 20]
 
+function getSavedPageSize() {
+  if (typeof window === 'undefined') {
+    return 5
+  }
+  const savedValue = Number(window.localStorage.getItem('users-settings-page-size'))
+  return pageSizeOptions.includes(savedValue) ? savedValue : 5
+}
+
+function savePageSize(value) {
+  if (typeof window === 'undefined') {
+    return
+  }
+  window.localStorage.setItem('users-settings-page-size', String(value))
+}
+
+pageSize.value = getSavedPageSize()
+
 const transitionName = computed(() => (initialPageLoad.value ? '' : `slide-${pageDirection.value}`))
 
 const modalOpen = ref(false)
@@ -131,6 +148,7 @@ async function loadUsers(page = currentPage.value) {
 
 function changePageSize(newSize) {
   pageSize.value = newSize
+  savePageSize(newSize)
   currentPage.value = 1
   pageDirection.value = 'left'
   loadUsers(1)
@@ -291,7 +309,7 @@ onMounted(async () => {
           No users found.
         </div>
 
-        <transition :name="'slide-' + pageDirection" mode="out-in">
+        <transition :name="transitionName" mode="out-in">
           <div :key="pageKey" class="space-y-4">
             <!-- <div
               v-if="loadingUsers"
