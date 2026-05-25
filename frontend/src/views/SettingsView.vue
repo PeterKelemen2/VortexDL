@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import AccountSettings from '@/components/AccountSettings.vue'
 import SecuritySettings from '@/components/SecuritySettings.vue'
 import UsersSettings from '@/components/UsersSettings.vue'
@@ -8,37 +9,45 @@ import { ContactRound, Users, Shield } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
+const auth = useAuthStore()
 
-const menuItems = [
-  {
-    id: 'account',
-    label: 'Account',
-    icon: ContactRound,
-    route: 'settings',
-    query: { tab: 'account' },
-    component: AccountSettings,
-  },
-  {
-    id: 'security',
-    label: 'Security',
-    icon: Shield,
-    route: 'settings',
-    query: { tab: 'security' },
-    component: SecuritySettings,
-  },
-  {
-    id: 'users',
-    label: 'Users',
-    icon: Users,
-    route: 'settings',
-    query: { tab: 'users' },
-    component: UsersSettings,
-  },
-]
+const menuItems = computed(() => {
+  const items = [
+    {
+      id: 'account',
+      label: 'Account',
+      icon: ContactRound,
+      route: 'settings',
+      query: { tab: 'account' },
+      component: AccountSettings,
+    },
+    {
+      id: 'security',
+      label: 'Security',
+      icon: Shield,
+      route: 'settings',
+      query: { tab: 'security' },
+      component: SecuritySettings,
+    },
+  ]
+
+  if (auth.isAdmin) {
+    items.push({
+      id: 'users',
+      label: 'Users',
+      icon: Users,
+      route: 'settings',
+      query: { tab: 'users' },
+      component: UsersSettings,
+    })
+  }
+
+  return items
+})
 
 const selectedItem = computed(() => {
   const currentTab = String(route.query.tab ?? '')
-  return menuItems.find((item) => item.id === currentTab) ?? menuItems[0]
+  return menuItems.value.find((item) => item.id === currentTab) ?? menuItems.value[0]
 })
 
 const selectedTab = computed(() => selectedItem.value.id)

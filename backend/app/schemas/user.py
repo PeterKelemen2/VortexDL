@@ -29,3 +29,15 @@ class UserUpdate(BaseModel):
     current_password: str | None = None
     new_password: str | None = None
     new_password_confirm: str | None = None
+
+
+class UserAdminUpdate(BaseModel):
+    username: str | None = None
+    role: str | None = None
+    new_password: str | None = None
+    new_password_confirm: str | None = None
+    confirm_email: EmailStr
+
+
+class UserAdminDelete(BaseModel):
+    confirm_email: EmailStr

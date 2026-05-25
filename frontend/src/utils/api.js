@@ -122,6 +122,20 @@ const api = {
     token,
     onTokenRefresh,
   }),
+  listUsers: (token, onTokenRefresh) => requestWithAuth('/admin/users', { token, onTokenRefresh }),
+  getAdminRoles: (token, onTokenRefresh) => requestWithAuth('/admin/roles', { token, onTokenRefresh }),
+  updateUserByAdmin: (userId, payload, token, onTokenRefresh) => requestWithAuth(`/admin/users/${userId}`, {
+    method: 'PATCH',
+    body: payload,
+    token,
+    onTokenRefresh,
+  }),
+  deleteUserByAdmin: (userId, payload, token, onTokenRefresh) => requestWithAuth(`/admin/users/${userId}`, {
+    method: 'DELETE',
+    body: payload,
+    token,
+    onTokenRefresh,
+  }),
 }
 
 export { hasSessionCookies, api }
