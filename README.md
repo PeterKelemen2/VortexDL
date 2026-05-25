@@ -60,3 +60,10 @@ This allows the bootstrap to promote an existing account that matches `username`
 - The bootstrap happens once on server startup.
 - After an admin exists, the startup bootstrap will no longer create or promote admin accounts.
 - If you want to change the admin user after bootstrap, use the application UI/API or direct database updates, not env bootstrap.
+
+## Profile photo management
+
+- Users can upload a profile photo from the account settings page.
+- The frontend provides a crop editor so the avatar area can be selected precisely.
+- Cropped profile images are stored and served as optimized variants for the avatar and thumbnails.
+- The application also keeps recent profile photos so users can preview and restore a previous image.
