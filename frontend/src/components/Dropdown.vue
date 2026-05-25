@@ -6,7 +6,41 @@ const props = defineProps({
   items: {
     type: Array,
     required: true,
-    // Each item: { label, route, query, icon } or { separator: true }
+    validator(value) {
+      if (!Array.isArray(value)) return false
+      return value.every((item) => {
+        if (item?.separator) {
+          return true
+        }
+
+        const hasLabel = typeof item.label === 'string'
+        const hasRoute = item.route === undefined || typeof item.route === 'string'
+        const hasQuery = item.query === undefined || typeof item.query === 'object'
+        const hasIcon =
+          item.icon === undefined ||
+          typeof item.icon === 'object' ||
+          typeof item.icon === 'function'
+        const hasTextClass = item.textClass === undefined || typeof item.textClass === 'string'
+        const hasBgClass = item.bgClass === undefined || typeof item.bgClass === 'string'
+        const hasHoverClass = item.hoverClass === undefined || typeof item.hoverClass === 'string'
+
+        return (
+          hasLabel && hasRoute && hasQuery && hasIcon && hasTextClass && hasBgClass && hasHoverClass
+        )
+      })
+    },
+  },
+  textClass: {
+    type: String,
+    default: 'text-gray-700',
+  },
+  bgClass: {
+    type: String,
+    default: '',
+  },
+  hoverClass: {
+    type: String,
+    default: 'hover:bg-gray-100',
   },
 })
 
@@ -47,14 +81,25 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
       class="absolute right-0 mt-2 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg z-50"
     >
       <template v-for="(item, index) in items" :key="index">
-        <hr v-if="item.separator" class="my-1 border-gray-200" />
+        <hr v-if="item.separator" class="border-gray-200" />
         <button
           v-else
           type="button"
           @click="navigate(item)"
-          class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+          :class="[
+            'flex w-full items-center gap-2 px-4 py-2 text-left text-sm',
+            item.textClass ?? props.textClass,
+            item.bgClass ?? props.bgClass,
+            item.hoverClass ?? props.hoverClass,
+          ]"
         >
-          <component :is="item.icon" v-if="item.icon" :size="16" class="shrink-0 text-gray-400" />
+          <component
+            :is="item.icon"
+            v-if="item.icon"
+            :size="16"
+            class="shrink-0 text-gray-400"
+            :class="[item.textClass ?? props.textClass]"
+          />
           {{ item.label }}
         </button>
       </template>

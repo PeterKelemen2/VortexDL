@@ -27,7 +27,13 @@ const profileMenuItems = [
   { label: 'Profile', route: 'profile', query: { tab: 'profile' }, icon: User },
   { label: 'Security', route: 'profile', query: { tab: 'security' }, icon: Shield },
   { separator: true },
-  { label: 'Log out', route: 'logout', icon: LogOut },
+  {
+    label: 'Log out',
+    route: 'logout',
+    icon: LogOut,
+    textClass: 'text-red-600 font-medium',
+    hoverClass: 'hover:bg-red-50',
+  },
 ]
 </script>
 
