@@ -23,6 +23,12 @@ async function onLogout() {
   router.push('/login')
 }
 
+function onProfileMenuSelect(item) {
+  if (item.route === 'logout' || item.action === 'logout') {
+    onLogout()
+  }
+}
+
 const profileMenuItems = [
   { label: 'Profile', route: 'profile', query: { tab: 'profile' }, icon: User },
   { label: 'Security', route: 'profile', query: { tab: 'security' }, icon: Shield },
@@ -61,7 +67,7 @@ const profileMenuItems = [
         </router-link>
 
         <div v-if="auth.user?.username" class="relative">
-          <Dropdown :items="profileMenuItems">
+          <Dropdown :items="profileMenuItems" @select="onProfileMenuSelect">
             <template #trigger="{ toggle }">
               <button
                 type="button"

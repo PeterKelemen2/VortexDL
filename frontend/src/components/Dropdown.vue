@@ -23,9 +23,20 @@ const props = defineProps({
         const hasTextClass = item.textClass === undefined || typeof item.textClass === 'string'
         const hasBgClass = item.bgClass === undefined || typeof item.bgClass === 'string'
         const hasHoverClass = item.hoverClass === undefined || typeof item.hoverClass === 'string'
+        const hasAction =
+          item.action === undefined ||
+          typeof item.action === 'string' ||
+          typeof item.action === 'function'
 
         return (
-          hasLabel && hasRoute && hasQuery && hasIcon && hasTextClass && hasBgClass && hasHoverClass
+          hasLabel &&
+          hasRoute &&
+          hasQuery &&
+          hasIcon &&
+          hasTextClass &&
+          hasBgClass &&
+          hasHoverClass &&
+          hasAction
         )
       })
     },
@@ -57,7 +68,13 @@ function toggle() {
 function navigate(item) {
   open.value = false
   emit('select', item)
-  if (item.route) {
+
+  if (typeof item.action === 'function') {
+    item.action(item)
+    return
+  }
+
+  if (item.route && item.route !== 'logout') {
     router.push({ name: item.route, query: item.query ?? {} })
   }
 }
