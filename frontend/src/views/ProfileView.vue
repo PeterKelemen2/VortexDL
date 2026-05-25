@@ -9,7 +9,17 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-const selectedTab = computed(() => (route.query.tab === 'security' ? 'security' : 'profile'))
+const menuItems = [
+  { id: 'profile', label: 'Profile', route: 'profile', query: { tab: 'profile' } },
+  { id: 'security', label: 'Security', route: 'profile', query: { tab: 'security' } },
+]
+
+const selectedItem = computed(() => {
+  const currentTab = String(route.query.tab ?? '')
+  return menuItems.find((item) => item.id === currentTab) ?? menuItems[0]
+})
+
+const selectedTab = computed(() => selectedItem.value.id)
 
 const profileForm = reactive({
   username: auth.user?.username ?? '',
@@ -192,57 +202,32 @@ onMounted(() => {
     loadSessions()
   }
 })
+
+function selectMenuItem(item) {
+  router.push({ name: item.route, query: item.query })
+}
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto px-4 py-8">
-    <div class="grid gap-6 lg:grid-cols-[260px_1fr]">
-      <aside class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 class="text-xl font-semibold text-slate-900 mb-4">Settings</h2>
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="grid gap-6 lg:grid-cols-[200px_1fr] items-start">
+      <aside class="border-r-2 border-gray-200 bg-white px-3 py-6 h-[calc(100vh-8rem)]">
         <nav class="space-y-2">
           <button
-            type="button"
-            @click="router.push({ name: 'profile', query: { tab: 'profile' } })"
-            :class="
-              selectedTab === 'profile'
-                ? 'bg-blue-50 text-blue-700'
-                : 'text-slate-700 hover:bg-slate-100'
-            "
-            class="w-full rounded-2xl px-4 py-3 text-left text-sm font-medium transition"
+            v-for="item in menuItems"
+            :key="item.id"
+            @click="selectMenuItem(item)"
+            class="w-full rounded-lg px-3 py-2 text-left font-medium transition hover:bg-blue-50 hover:text-blue-700"
           >
-            Profile
-          </button>
-          <button
-            type="button"
-            @click="router.push({ name: 'profile', query: { tab: 'security' } })"
-            :class="
-              selectedTab === 'security'
-                ? 'bg-blue-50 text-blue-700'
-                : 'text-slate-700 hover:bg-slate-100'
-            "
-            class="w-full rounded-2xl px-4 py-3 text-left text-sm font-medium transition"
-          >
-            Security
+            {{ item.label }}
           </button>
         </nav>
       </aside>
 
-      <main class="space-y-6">
-        <section class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 class="text-2xl font-bold text-slate-900">Profile settings</h1>
-              <p class="text-sm text-slate-600">
-                Manage your account name and password from one place.
-              </p>
-            </div>
-            <span
-              class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700"
-            >
-              {{ selectedTab === 'security' ? 'Security' : 'Profile' }}
-            </span>
-          </div>
-        </section>
+      <main class="space-y-6 h-[calc(100vh-8rem)] overflow-auto">
+        <div class="flex mt-6">
+          <h1>{{ selectedItem.label }} settings</h1>
+        </div>
 
         <section v-if="selectedTab === 'profile'" class="space-y-6">
           <section class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">

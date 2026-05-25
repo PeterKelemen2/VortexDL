@@ -25,7 +25,7 @@ async function onLogout() {
 
 const profileMenuItems = [
   { label: 'Profile', route: 'profile', query: { tab: 'profile' }, icon: User },
-  { label: 'Security', route: 'profile', query: { tab: 'security' }, icon: Shield },
+  // { label: 'Security', route: 'profile', query: { tab: 'security' }, icon: Shield },
   { separator: true },
   {
     label: 'Log out',
