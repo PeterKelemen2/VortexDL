@@ -76,7 +76,7 @@ onBeforeUnmount(() => {
       enter-to-class="opacity-100 translate-y-0"
       leave-active-class="duration-200 ease-in"
       leave-from-class="opacity-100 translate-y-0"
-      leave-to-class="opacity-0 -translate-y-8"
+      leave-to-class="opacity-0 translate-y-8 sm:-translate-y-8"
       @after-leave="onAfterLeave"
     >
       <div
