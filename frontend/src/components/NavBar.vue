@@ -5,12 +5,19 @@ import { useAuthStore } from '@/stores/auth'
 import { LogOut, ShieldCheck, Settings } from 'lucide-vue-next'
 import Dropdown from '@/components/Dropdown.vue'
 import { useUserInitials } from '@/composables/useUserInitials'
+import { resolveBackendUrl } from '@/utils/url'
 import { BRAND_NAME, BRAND_ROUTE, BRAND_ICON } from '@/constants/branding'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const showMenu = ref(false)
+
+const activeProfileImageUrl = computed(() => {
+  const image = auth.user?.profile_image
+  if (!image) return null
+  return resolveBackendUrl(image.url || image.file_path)
+})
 
 const avatarStyle = computed(() => {
   const image = auth.user?.profile_image
@@ -22,22 +29,18 @@ const avatarStyle = computed(() => {
     image.original_width == null ||
     image.original_height == null
   ) {
-    return {
-      width: '100%',
-      height: '100%',
-      objectFit: 'cover',
-    }
+    return null
   }
 
   const buttonSize = 40
   const scale = buttonSize / image.crop_size
   return {
-    position: 'absolute',
-    top: '0',
-    left: '0',
-    width: `${image.original_width * scale}px`,
-    height: `${image.original_height * scale}px`,
-    transform: `translate(${-image.crop_x * scale}px, ${-image.crop_y * scale}px)`,
+    backgroundImage: `url('${activeProfileImageUrl.value}')`,
+    backgroundSize: `${image.original_width * scale}px ${image.original_height * scale}px`,
+    backgroundPosition: `${-image.crop_x * scale}px ${-image.crop_y * scale}px`,
+    backgroundRepeat: 'no-repeat',
+    width: '100%',
+    height: '100%',
   }
 })
 
@@ -99,12 +102,18 @@ const profileMenuItems = [
                   @click="toggle"
                   class="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-blue-400 text-sm font-semibold leading-none text-white transition-colors hover:bg-blue-500 active:bg-blue-700"
                 >
-                  <template v-if="auth.user?.profile_image?.url">
+                  <template v-if="auth.user?.profile_image && avatarStyle">
+                    <div :style="avatarStyle" aria-label="Profile" />
+                  </template>
+                  <template v-else-if="auth.user?.profile_image">
                     <img
-                      :src="auth.user.profile_image.url"
+                      :src="
+                        resolveBackendUrl(
+                          auth.user.profile_image.url || auth.user.profile_image.file_path,
+                        )
+                      "
                       alt="Profile"
-                      class="absolute inset-0 h-full w-full"
-                      :style="avatarStyle"
+                      class="absolute inset-0 h-full w-full object-cover"
                     />
                   </template>
                   <template v-else>
