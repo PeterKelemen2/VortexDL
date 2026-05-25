@@ -104,14 +104,15 @@ onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 
-onBeforeRouteLeave((to, from, next) => {
+onBeforeRouteLeave((to, from) => {
   if (!hasUnsavedChanges.value) {
-    next()
-    return
+    return true
   }
 
   showUnsavedModal.value = true
-  pendingRouteLeave.value = next
+  return new Promise((resolve) => {
+    pendingRouteLeave.value = resolve
+  })
 })
 
 async function updateProfile() {
