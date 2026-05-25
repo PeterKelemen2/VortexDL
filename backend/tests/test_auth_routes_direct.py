@@ -9,9 +9,9 @@ from app.core.security import create_access_token, hash_password
 from app.models.role import Role
 from app.models.user import User
 from app.models.refresh_token import RefreshToken
-from app.services.auth_service import ensure_roles_exist, create_tokens, hash_token
-from app.api.routes.auth import login, refresh, revoke_all_sessions, revoke_current_session, revoke_session
-from app.schemas.user import UserLogin
+from app.services.auth_service import authenticate_user, ensure_roles_exist, create_tokens, hash_token
+from app.api.routes.auth import login, refresh, revoke_all_sessions, revoke_current_session, revoke_session, update_me
+from app.schemas.user import UserLogin, UserUpdate
 from app.schemas.auth import TokenRefreshRequest
 
 
@@ -197,3 +197,43 @@ async def test_revoke_current_session_route_direct_returns_none():
         request = build_request(headers={"x-csrf-token": "csrf-token"}, cookies="csrf_token=csrf-token")
         result = await revoke_current_session(request, user, session)
         assert result is None
+
+
+@pytest.mark.asyncio
+async def test_update_me_route_direct_changes_username_and_password():
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM refresh_tokens"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        roles = await ensure_roles_exist(session)
+        user = User(
+            username="directupdate",
+            email="directupdate@example.com",
+            hashed_password=hash_password("Password123!"),
+            role_id=roles["user"].id,
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+        request = build_request(headers={"x-csrf-token": "csrf-token"}, cookies="csrf_token=csrf-token")
+        updated_user = await update_me(
+            UserUpdate(
+                username="directupdated",
+                current_password="Password123!",
+                new_password="Password123!",
+                new_password_confirm="Password123!",
+            ),
+            request,
+            user,
+            session,
+        )
+
+        assert updated_user.username == "directupdated"
+        assert updated_user.email == "directupdate@example.com"
+
+        # Verify password changed by reauthenticating
+        auth_user = await authenticate_user(session, "directupdated", "Password123!")
+        assert auth_user is not None

@@ -116,6 +116,12 @@ const api = {
     token,
     onTokenRefresh,
   }),
+  updateCurrentUser: (payload, token, onTokenRefresh) => requestWithAuth('/auth/me', {
+    method: 'PATCH',
+    body: payload,
+    token,
+    onTokenRefresh,
+  }),
 }
 
 export { hasSessionCookies, api }

@@ -1,14 +1,28 @@
 <script setup>
-import { useRouter } from 'vue-router'
+import { ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LogOut, ShieldCheck, Home } from 'lucide-vue-next'
+import { LogOut, ShieldCheck, Home, ChevronDown } from 'lucide-vue-next'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
+const showMenu = ref(false)
+
+watch(
+  () => route.fullPath,
+  () => {
+    showMenu.value = false
+  },
+)
 
 async function onLogout() {
   await auth.logout()
   router.push('/login')
+}
+
+function goTo(tab) {
+  router.push({ name: 'profile', query: { tab } })
 }
 </script>
 
@@ -35,13 +49,35 @@ async function onLogout() {
           Admin
         </router-link>
 
-        <router-link
-          v-if="auth.user?.username"
-          to="/profile"
-          class="text-sm text-gray-500 inline-flex hover:text-blue-700 transition-colors"
-        >
-          {{ auth.user.username }}
-        </router-link>
+        <div v-if="auth.user?.username" class="relative">
+          <button
+            type="button"
+            @click="showMenu = !showMenu"
+            class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-blue-700 transition-colors px-2 py-1 rounded-md hover:bg-blue-50"
+          >
+            {{ auth.user.username }}
+            <ChevronDown class="w-4 h-4" />
+          </button>
+          <div
+            v-if="showMenu"
+            class="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
+          >
+            <button
+              type="button"
+              @click="goTo('profile')"
+              class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              Profile
+            </button>
+            <button
+              type="button"
+              @click="goTo('security')"
+              class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              Security
+            </button>
+          </div>
+        </div>
 
         <button
           @click="onLogout"

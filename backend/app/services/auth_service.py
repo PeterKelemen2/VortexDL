@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from app.schemas.user import UserRead, UserRegister, UserLogin
+from app.schemas.user import UserRead, UserRegister, UserLogin, UserUpdate
 from app.schemas.auth import TokenResponse, TokenRefreshRequest
 from app.models.role import Role
 from app.models.user import User
@@ -487,3 +487,37 @@ def get_user_info(current_user: User):
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
     )
+
+
+async def update_current_user(current_user: User, user_update: UserUpdate, db: AsyncSession):
+    should_change_username = bool(user_update.username and user_update.username.strip() and user_update.username.strip() != current_user.username)
+    should_change_password = bool(user_update.new_password)
+
+    if not should_change_username and not should_change_password:
+        return get_user_info(current_user)
+
+    if not user_update.current_password:
+        raise HTTPException(status_code=400, detail="Current password is required to update profile")
+
+    if not verify_password(user_update.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid current password")
+
+    if should_change_username:
+        new_username = user_update.username.strip()
+        stmt = select(User).where(User.username == new_username)
+        result = await db.execute(stmt)
+        existing_user = result.scalar_one_or_none()
+        if existing_user and existing_user.id != current_user.id:
+            raise HTTPException(status_code=400, detail="Username already taken")
+        current_user.username = new_username
+
+    if should_change_password:
+        if user_update.new_password != user_update.new_password_confirm:
+            raise HTTPException(status_code=400, detail="Password confirmation does not match")
+        validate_password_strength(user_update.new_password)
+        current_user.hashed_password = hash_password(user_update.new_password)
+
+    current_user.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(current_user)
+    return get_user_info(current_user)

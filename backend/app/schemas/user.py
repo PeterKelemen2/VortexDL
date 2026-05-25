@@ -22,3 +22,10 @@ class UserRead(UserBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserUpdate(BaseModel):
+    username: str | None = None
+    current_password: str | None = None
+    new_password: str | None = None
+    new_password_confirm: str | None = None
