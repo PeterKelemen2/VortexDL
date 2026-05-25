@@ -64,14 +64,12 @@ function selectMenuItem(item) {
         </nav>
       </aside>
 
-      <main
-        class="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-gray-200 bg-slate-50 shadow-sm"
-      >
-        <div class="border-b border-gray-200 bg-white px-6 py-5">
+      <main class="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl">
+        <!-- <div class="border-b border-gray-200 bg-white px-6 py-5">
           <h2>{{ selectedItem.label }} settings</h2>
-        </div>
+        </div> -->
 
-        <section class="h-full min-h-0 overflow-auto px-6 py-6">
+        <section class="h-full min-h-0 overflow-auto py-6">
           <component :is="selectedItem.component" />
         </section>
       </main>
