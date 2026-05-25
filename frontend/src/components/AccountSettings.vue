@@ -11,6 +11,7 @@ import TextInput from '@/components/TextInput.vue'
 import ProfileImageCropper from '@/components/ProfileImageCropper.vue'
 import { usePasswordStrength } from '@/composables/usePasswordStrength'
 import { useUserInitials } from '@/composables/useUserInitials'
+import { Edit2 } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 
@@ -54,7 +55,10 @@ const activeProfileImage = computed(() => auth.user?.profile_image ?? null)
 const activeProfileImageUrl = computed(() => {
   const image = activeProfileImage.value
   if (!image) return null
-  return resolveBackendUrl(image.avatar_url || image.url || image.file_path)
+  return resolveBackendUrl(
+    image.avatar_url || image.url || image.file_path,
+    image.updated_at,
+  )
 })
 
 const profileImageStyle = computed(() => {
@@ -79,17 +83,17 @@ const passwordSubmitting = ref(false)
 const uploadError = ref('')
 const uploadInProgress = ref(false)
 const showCropModal = ref(false)
-const currentUpload = ref(null)
+const currentCropSession = ref(null)
 const recentProfileImages = ref([])
 const showActivateModal = ref(false)
 const selectedImageToActivate = ref(null)
 const activationError = ref('')
 const activationInProgress = ref(false)
 
-function buildVariantPreviewStyle(imageUrl) {
+function buildVariantPreviewStyle(imageUrl, version = null) {
   if (!imageUrl) return null
   return {
-    backgroundImage: `url('${resolveBackendUrl(imageUrl)}')`,
+    backgroundImage: `url('${resolveBackendUrl(imageUrl, version)}')`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
@@ -101,7 +105,10 @@ function buildVariantPreviewStyle(imageUrl) {
 const selectedImagePreviewStyle = computed(() => {
   const image = selectedImageToActivate.value
   if (!image) return null
-  return buildVariantPreviewStyle(image.preview_url || image.url || image.file_path)
+  return buildVariantPreviewStyle(
+    image.preview_url || image.url || image.file_path,
+    image.updated_at,
+  )
 })
 
 async function loadRecentProfileImages() {
@@ -118,8 +125,8 @@ async function loadRecentProfileImages() {
 }
 
 function revokeCurrentUploadPreview() {
-  if (currentUpload.value?.previewUrl) {
-    URL.revokeObjectURL(currentUpload.value.previewUrl)
+  if (currentCropSession.value?.previewUrl) {
+    URL.revokeObjectURL(currentCropSession.value.previewUrl)
   }
 }
 
@@ -151,7 +158,8 @@ async function onProfileImageSelected(event) {
   }
 
   const previewUrl = URL.createObjectURL(file)
-  currentUpload.value = {
+  currentCropSession.value = {
+    mode: 'upload',
     file,
     previewUrl,
   }
@@ -160,40 +168,92 @@ async function onProfileImageSelected(event) {
 }
 
 async function handleCropSave(cropData) {
-  if (!currentUpload.value?.file) {
-    uploadError.value = 'Unable to crop image: missing upload file.'
+  if (!currentCropSession.value) {
+    uploadError.value = 'Unable to crop image: missing upload session.'
     return
   }
 
-  uploadInProgress.value = true
-  try {
-    const formData = new FormData()
-    formData.append('image', currentUpload.value.file)
-    const uploaded = await api.uploadProfileImage(formData, auth.accessToken, auth.setAccessToken)
-    const updatedImage = await api.setProfileImageCrop(
-      uploaded.id,
-      cropData,
-      auth.accessToken,
-      auth.setAccessToken,
-    )
-    if (auth.user) {
-      auth.user.profile_image = updatedImage
+  if (currentCropSession.value.mode === 'upload') {
+    if (!currentCropSession.value.file) {
+      uploadError.value = 'Unable to crop image: missing upload file.'
+      return
     }
-    await loadRecentProfileImages()
-    showCropModal.value = false
-    revokeCurrentUploadPreview()
-    currentUpload.value = null
-  } catch (error) {
-    uploadError.value = error.message
-  } finally {
-    uploadInProgress.value = false
+
+    uploadInProgress.value = true
+    try {
+      const formData = new FormData()
+      formData.append('image', currentCropSession.value.file)
+      const uploaded = await api.uploadProfileImage(formData, auth.accessToken, auth.setAccessToken)
+      const updatedImage = await api.setProfileImageCrop(
+        uploaded.id,
+        cropData,
+        auth.accessToken,
+        auth.setAccessToken,
+      )
+      if (auth.user) {
+        auth.user.profile_image = updatedImage
+      }
+      await loadRecentProfileImages()
+      showCropModal.value = false
+      revokeCurrentUploadPreview()
+      currentCropSession.value = null
+    } catch (error) {
+      uploadError.value = error.message
+    } finally {
+      uploadInProgress.value = false
+    }
+    return
   }
+
+  if (currentCropSession.value.mode === 'edit') {
+    uploadInProgress.value = true
+    try {
+      const updatedImage = await api.setProfileImageCrop(
+        currentCropSession.value.imageId,
+        cropData,
+        auth.accessToken,
+        auth.setAccessToken,
+      )
+      if (auth.user) {
+        auth.user.profile_image = updatedImage
+      }
+      await loadRecentProfileImages()
+      showCropModal.value = false
+      currentCropSession.value = null
+    } catch (error) {
+      uploadError.value = error.message
+    } finally {
+      uploadInProgress.value = false
+    }
+    return
+  }
+
+  uploadError.value = 'Unsupported crop session.'
 }
 
 function handleCropCancel() {
   showCropModal.value = false
   revokeCurrentUploadPreview()
-  currentUpload.value = null
+  currentCropSession.value = null
+}
+
+function editCurrentCrop() {
+  const image = activeProfileImage.value
+  if (!image) return
+
+  currentCropSession.value = {
+    mode: 'edit',
+    imageId: image.id,
+    imageUrl: resolveBackendUrl(image.url || image.file_path),
+    cropData: {
+      crop_x: image.crop_x,
+      crop_y: image.crop_y,
+      crop_size: image.crop_size,
+      original_width: image.original_width,
+      original_height: image.original_height,
+    },
+  }
+  showCropModal.value = true
 }
 
 function selectImageToActivate(image) {
@@ -383,7 +443,7 @@ async function updatePassword() {
       <div class="grid gap-5 sm:grid-cols-[auto_1fr] sm:items-center">
         <div class="flex items-center justify-center">
           <div
-            class="relative h-24 w-24 overflow-hidden rounded-full border border-slate-200 bg-slate-100"
+            class="relative group h-24 w-24 overflow-hidden rounded-full border border-slate-200 bg-slate-100"
           >
             <div
               v-if="activeProfileImage && profileImageStyle"
@@ -402,6 +462,16 @@ async function updatePassword() {
             >
               {{ useUserInitials(auth.user.username) }}
             </div>
+
+            <button
+              v-if="activeProfileImage"
+              type="button"
+              @click="editCurrentCrop"
+              class="absolute inset-0 flex items-center justify-center bg-slate-950/0 opacity-0 transition duration-200 hover:bg-slate-950/30 group-hover:opacity-100"
+              aria-label="Edit crop"
+            >
+              <Edit2 class="h-5 w-5 text-white" />
+            </button>
           </div>
         </div>
 
@@ -447,7 +517,7 @@ async function updatePassword() {
             <div class="relative h-16 w-16 overflow-hidden rounded-full bg-slate-100">
               <div
                 v-if="image.thumbnail_url"
-                :style="buildVariantPreviewStyle(image.thumbnail_url)"
+                :style="buildVariantPreviewStyle(image.thumbnail_url, image.updated_at)"
                 class="h-full w-full"
               />
               <img
@@ -590,8 +660,13 @@ async function updatePassword() {
     >
       <template #default>
         <ProfileImageCropper
-          v-if="currentUpload"
-          :image-url="currentUpload.previewUrl"
+          v-if="currentCropSession"
+          :image-url="
+            currentCropSession.mode === 'upload'
+              ? currentCropSession.previewUrl
+              : currentCropSession.imageUrl
+          "
+          :initial-crop="currentCropSession.mode === 'edit' ? currentCropSession.cropData : null"
           @save="handleCropSave"
           @cancel="handleCropCancel"
         />

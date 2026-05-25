@@ -16,7 +16,7 @@ const showMenu = ref(false)
 const activeProfileImageUrl = computed(() => {
   const image = auth.user?.profile_image
   if (!image) return null
-  return resolveBackendUrl(image.avatar_url || image.url || image.file_path)
+  return resolveBackendUrl(image.avatar_url || image.url || image.file_path, image.updated_at)
 })
 
 const avatarStyle = computed(() => {

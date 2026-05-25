@@ -6,6 +6,10 @@ const props = defineProps({
     type: String,
     required: true,
   },
+  initialCrop: {
+    type: Object,
+    default: null,
+  },
   imageAlt: {
     type: String,
     default: 'Profile image preview',
@@ -60,6 +64,31 @@ function centerImage() {
   position.value = { x: 0, y: 0 }
 }
 
+function applyInitialCrop(cropData) {
+  if (
+    !cropData ||
+    cropData.crop_x == null ||
+    cropData.crop_y == null ||
+    cropData.crop_size == null ||
+    cropData.original_width == null ||
+    cropData.original_height == null
+  ) {
+    return
+  }
+
+  const desiredScale = cropViewportSize / cropData.crop_size
+  zoom.value = Math.max(1, desiredScale / baseScale.value)
+
+  const cropCenterX = cropData.crop_x + cropData.crop_size / 2
+  const cropCenterY = cropData.crop_y + cropData.crop_size / 2
+  const effectiveScale = currentScale.value
+
+  position.value = updateBounds({
+    x: -(cropCenterX - imageNaturalWidth.value / 2) * effectiveScale,
+    y: -(cropCenterY - imageNaturalHeight.value / 2) * effectiveScale,
+  })
+}
+
 function setImageDimensions(image) {
   if (!image || !image.naturalWidth || !image.naturalHeight) {
     return
@@ -79,6 +108,9 @@ function setImageDimensions(image) {
   baseScale.value = baseScaleValue
   zoom.value = 1
   centerImage()
+  if (props.initialCrop) {
+    applyInitialCrop(props.initialCrop)
+  }
   imageLoaded.value = true
 }
 
@@ -155,7 +187,7 @@ watch([displaySize, () => imageNaturalWidth.value, () => imageNaturalHeight.valu
 })
 
 watch(
-  () => props.imageUrl,
+  [() => props.imageUrl, () => props.initialCrop],
   () => {
     if (imageRef.value && imageRef.value.complete) {
       setImageDimensions(imageRef.value)
