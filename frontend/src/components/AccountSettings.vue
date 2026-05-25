@@ -3,6 +3,7 @@ import { computed, ref, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/utils/api'
+import { resolveBackendUrl } from '@/utils/url'
 import Modal from '@/components/Modal.vue'
 import PasswordInput from '@/components/PasswordInput.vue'
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter.vue'
@@ -48,6 +49,38 @@ const showConfirmMismatch = computed(
 )
 
 const activeProfileImage = computed(() => auth.user?.profile_image ?? null)
+
+const activeProfileImageUrl = computed(() => {
+  const image = activeProfileImage.value
+  if (!image) return null
+  return resolveBackendUrl(image.url || image.file_path)
+})
+
+const profileImageStyle = computed(() => {
+  const image = activeProfileImage.value
+  if (
+    !image ||
+    image.crop_x == null ||
+    image.crop_y == null ||
+    image.crop_size == null ||
+    image.original_width == null ||
+    image.original_height == null
+  ) {
+    return null
+  }
+
+  const containerSize = 96
+  const scale = containerSize / image.crop_size
+
+  return {
+    backgroundImage: `url('${activeProfileImageUrl.value}')`,
+    backgroundSize: `${image.original_width * scale}px ${image.original_height * scale}px`,
+    backgroundPosition: `${-image.crop_x * scale}px ${-image.crop_y * scale}px`,
+    backgroundRepeat: 'no-repeat',
+    width: '100%',
+    height: '100%',
+  }
+})
 
 const profileError = ref('')
 const profileSuccess = ref('')
@@ -273,10 +306,17 @@ async function updatePassword() {
       </p>
       <div class="grid gap-5 sm:grid-cols-[auto_1fr] sm:items-center">
         <div class="flex items-center justify-center">
-          <div class="h-24 w-24 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+          <div
+            class="relative h-24 w-24 overflow-hidden rounded-full border border-slate-200 bg-slate-100"
+          >
+            <div
+              v-if="activeProfileImage && profileImageStyle"
+              :style="profileImageStyle"
+              aria-label="Current profile image"
+            />
             <img
-              v-if="activeProfileImage?.url"
-              :src="activeProfileImage.url"
+              v-else-if="activeProfileImage"
+              :src="resolveBackendUrl(activeProfileImage.url || activeProfileImage.file_path)"
               alt="Current profile image"
               class="h-full w-full object-cover"
             />

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
   imageUrl: {
@@ -14,7 +14,6 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'cancel'])
 
-const containerSize = 360
 const cropViewportSize = 360
 const imageNaturalWidth = ref(0)
 const imageNaturalHeight = ref(0)
@@ -23,6 +22,7 @@ const zoom = ref(1)
 const position = ref({ x: 0, y: 0 })
 const dragging = ref(false)
 const imageRef = ref(null)
+const containerRef = ref(null)
 const dragStart = ref({ x: 0, y: 0 })
 const pointerStart = ref({ x: 0, y: 0 })
 const imageLoaded = ref(false)
@@ -118,20 +118,27 @@ function onScaleChange(event) {
 }
 
 function save() {
-  if (!imageLoaded.value) return
-  const S = currentScale.value
-  const cropSize = Math.round(cropViewportSize / S)
-  // position is in screen pixels; convert to original image coordinates
-  const cropX = Math.round(
-    imageNaturalWidth.value / 2 - cropViewportSize / (2 * S) - position.value.x / S,
+  if (!imageLoaded.value || !imageRef.value || !containerRef.value) return
+
+  const imageRect = imageRef.value.getBoundingClientRect()
+  const cropRect = containerRef.value.getBoundingClientRect()
+  const scaleFactor = imageNaturalWidth.value / imageRect.width
+
+  const rawCropX = Math.round((cropRect.left - imageRect.left) * scaleFactor)
+  const rawCropY = Math.round((cropRect.top - imageRect.top) * scaleFactor)
+  const rawCropSize = Math.round(cropViewportSize * scaleFactor)
+
+  const cropSize = Math.max(
+    1,
+    Math.min(rawCropSize, imageNaturalWidth.value, imageNaturalHeight.value),
   )
-  const cropY = Math.round(
-    imageNaturalHeight.value / 2 - cropViewportSize / (2 * S) - position.value.y / S,
-  )
+  const cropX = Math.max(0, Math.min(rawCropX, imageNaturalWidth.value - cropSize))
+  const cropY = Math.max(0, Math.min(rawCropY, imageNaturalHeight.value - cropSize))
+
   emit('save', {
-    crop_x: Math.max(0, cropX),
-    crop_y: Math.max(0, cropY),
-    crop_size: Math.max(0, cropSize),
+    crop_x: cropX,
+    crop_y: cropY,
+    crop_size: cropSize,
     original_width: imageNaturalWidth.value,
     original_height: imageNaturalHeight.value,
   })
@@ -166,6 +173,7 @@ watch(
 
     <div class="mx-auto w-90 rounded-3xl border border-slate-200 bg-slate-900/5 p-4">
       <div
+        ref="containerRef"
         class="relative mx-auto h-90 w-90 overflow-hidden rounded-3xl bg-slate-900"
         @pointermove="onPointerMove"
         @pointerup="stopDrag"
