@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LogOut, ShieldCheck, User } from 'lucide-vue-next'
+import { LogOut, ShieldCheck, Settings } from 'lucide-vue-next'
 import Dropdown from '@/components/Dropdown.vue'
 import { useUserInitials } from '@/composables/useUserInitials'
 import { BRAND_NAME, BRAND_ROUTE, BRAND_ICON } from '@/constants/branding'
@@ -25,7 +25,7 @@ async function onLogout() {
 }
 
 const profileMenuItems = [
-  { label: 'Profile', route: 'profile', query: { tab: 'profile' }, icon: User },
+  { label: 'Settings', route: 'settings', query: { tab: 'settings' }, icon: Settings },
   // { label: 'Security', route: 'profile', query: { tab: 'security' }, icon: Shield },
   { separator: true },
   {

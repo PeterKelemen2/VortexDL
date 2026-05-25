@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import AccountSettings from '@/components/AccountSettings.vue'
 import SecuritySettings from '@/components/SecuritySettings.vue'
+import UsersSettings from '@/components/UsersSettings.vue'
+import { ContactRound, Users, Shield } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
@@ -11,16 +13,26 @@ const menuItems = [
   {
     id: 'account',
     label: 'Account',
-    route: 'profile',
+    icon: ContactRound,
+    route: 'settings',
     query: { tab: 'account' },
     component: AccountSettings,
   },
   {
     id: 'security',
     label: 'Security',
-    route: 'profile',
+    icon: Shield,
+    route: 'settings',
     query: { tab: 'security' },
     component: SecuritySettings,
+  },
+  {
+    id: 'users',
+    label: 'Users',
+    icon: Users,
+    route: 'settings',
+    query: { tab: 'users' },
+    component: UsersSettings,
   },
 ]
 
@@ -59,6 +71,7 @@ function selectMenuItem(item) {
               { 'text-slate-700': selectedTab !== item.id },
             ]"
           >
+            <component :is="item.icon" class="inline-block w-4 h-4 mr-2" v-if="item.icon" />
             {{ item.label }}
           </button>
         </nav>
