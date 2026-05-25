@@ -19,6 +19,9 @@ const totalPages = ref(1)
 const totalUsers = ref(0)
 const pageDirection = ref('left')
 const pageKey = ref(0)
+const initialPageLoad = ref(true)
+
+const transitionName = computed(() => (initialPageLoad.value ? '' : `slide-${pageDirection.value}`))
 
 const modalOpen = ref(false)
 const currentAction = ref('')
@@ -109,12 +112,15 @@ async function loadUsers(page = currentPage.value) {
     currentPage.value = response.page
     totalPages.value = response.total_pages
     totalUsers.value = response.total
-    pageKey.value += 1
+    if (!initialPageLoad.value) {
+      pageKey.value += 1
+    }
     if (currentPage.value > totalPages.value && totalPages.value > 0) {
       currentPage.value = totalPages.value
       await loadUsers(currentPage.value)
       return
     }
+    initialPageLoad.value = false
   } catch (error) {
     pageError.value = error.message || 'Unable to load users.'
   } finally {
