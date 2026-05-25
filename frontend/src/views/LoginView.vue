@@ -2,7 +2,8 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Eye, EyeOff } from 'lucide-vue-next'
+import PasswordInput from '@/components/PasswordInput.vue'
+import TextInput from '@/components/TextInput.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -10,7 +11,6 @@ const form = ref({ username: '', password: '' })
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
-const showPassword = ref(false)
 
 async function getDeviceData() {
   const userAgent = navigator.userAgent || undefined
@@ -64,29 +64,18 @@ async function onLogin() {
     <div class="card bg-primary-light">
       <h2>Login</h2>
       <form @submit.prevent="onLogin" class="space-y-5">
-        <div>
-          <label>Username</label>
-          <input v-model="form.username" required autocomplete="username" />
-        </div>
-        <div>
-          <label>Password</label>
-          <div class="relative">
-            <input
-              v-model="form.password"
-              :type="showPassword ? 'text' : 'password'"
-              required
-              autocomplete="current-password"
-            />
-            <button
-              type="button"
-              @click="showPassword = !showPassword"
-              class="absolute right-2 top-1/2 -translate-y-1/2 text-blue-600 hover:text-blue-800 p-1"
-              aria-label="Toggle password visibility"
-            >
-              <component :is="showPassword ? EyeOff : Eye" class="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+        <TextInput
+          v-model="form.username"
+          label="Username"
+          autocomplete="username"
+          required
+        />
+        <PasswordInput
+          v-model="form.password"
+          label="Password"
+          autocomplete="current-password"
+          required
+        />
         <button type="submit" :disabled="loading" class="btn w-full">
           {{ loading ? 'Logging in...' : 'Login' }}
         </button>

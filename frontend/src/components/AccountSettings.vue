@@ -2,6 +2,8 @@
 import { ref, reactive, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/utils/api'
+import PasswordInput from '@/components/PasswordInput.vue'
+import TextInput from '@/components/TextInput.vue'
 
 const auth = useAuthStore()
 
@@ -112,34 +114,23 @@ async function updatePassword() {
         Update your account name and confirm changes with your current password.
       </p>
       <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-slate-800 mb-2" for="username">
-            Username
-          </label>
-          <input
-            id="username"
-            v-model="profileForm.username"
-            type="text"
-            class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          />
-        </div>
-        <div>
-          <label
-            class="block text-sm font-medium text-slate-800 mb-2"
-            for="username-current-password"
-          >
-            Current password
-          </label>
-          <input
-            id="username-current-password"
-            v-model="profileForm.currentPassword"
-            type="password"
-            class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          />
-        </div>
+        <TextInput
+          v-model="profileForm.username"
+          label="Username"
+          autocomplete="username"
+          required
+        />
+        <PasswordInput
+          v-model="profileForm.currentPassword"
+          label="Password"
+          autocomplete="current-password"
+          required
+        />
+
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p class="text-sm text-slate-600">
-            Your current username is <strong>{{ auth.user?.username }}</strong>.
+            Your current username is <strong>{{ auth.user?.username }}</strong
+            >.
           </p>
           <button
             type="button"
@@ -172,42 +163,25 @@ async function updatePassword() {
         password.
       </p>
       <div class="space-y-4">
-        <div>
-          <label
-            class="block text-sm font-medium text-slate-800 mb-2"
-            for="password-current-password"
-          >
-            Current password
-          </label>
-          <input
-            id="password-current-password"
-            v-model="passwordForm.currentPassword"
-            type="password"
-            class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-800 mb-2" for="new-password">
-            New password
-          </label>
-          <input
-            id="new-password"
-            v-model="passwordForm.newPassword"
-            type="password"
-            class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-800 mb-2" for="confirm-new-password">
-            Confirm new password
-          </label>
-          <input
-            id="confirm-new-password"
-            v-model="passwordForm.newPasswordConfirm"
-            type="password"
-            class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          />
-        </div>
+        <PasswordInput
+          v-model="passwordForm.currentPassword"
+          label="Current password"
+          autocomplete="password-current-password"
+          required
+        />
+        <PasswordInput
+          v-model="passwordForm.newPassword"
+          label="New password"
+          autocomplete="password-new-password"
+          required
+        />
+        <PasswordInput
+          v-model="passwordForm.newPasswordConfirm"
+          label="Confirm new password"
+          autocomplete="password-confirm-new"
+          required
+        />
+
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p class="text-sm text-slate-600">Password strength must meet the backend policy.</p>
           <button

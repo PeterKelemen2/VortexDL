@@ -3,7 +3,8 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../utils/api'
 import { useAuthStore } from '@/stores/auth'
-import { Eye, EyeOff } from 'lucide-vue-next'
+import PasswordInput from '@/components/PasswordInput.vue'
+import TextInput from '@/components/TextInput.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -11,8 +12,6 @@ const form = ref({ username: '', email: '', password: '', password_confirm: '' }
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
-const showPassword = ref(false)
-const showPasswordConf = ref(false)
 const confirmFocused = ref(false)
 const confirmTouched = ref(false)
 
@@ -143,32 +142,26 @@ async function onRegister() {
     <div class="card bg-primary-light">
       <h2>Register</h2>
       <form @submit.prevent="onRegister" class="space-y-5">
+        <TextInput
+          v-model="form.username"
+          label="Username"
+          autocomplete="username"
+          required
+        />
+        <TextInput
+          v-model="form.email"
+          label="Email"
+          type="email"
+          autocomplete="email"
+          required
+        />
         <div>
-          <label class="block text-gray-700 mb-1 font-medium">Username</label>
-          <input v-model="form.username" required autocomplete="username" />
-        </div>
-        <div>
-          <label class="block text-gray-700 mb-1 font-medium">Email</label>
-          <input v-model="form.email" type="email" required autocomplete="email" />
-        </div>
-        <div>
-          <label class="block text-gray-700 mb-1 font-medium">Password</label>
-          <div class="relative">
-            <input
-              v-model="form.password"
-              :type="showPassword ? 'text' : 'password'"
-              required
-              autocomplete="new-password"
-            />
-            <button
-              type="button"
-              @click="showPassword = !showPassword"
-              class="absolute right-2 top-1/2 -translate-y-1/2 text-blue-600 hover:text-blue-800 p-1"
-              aria-label="Toggle password visibility"
-            >
-              <component :is="showPassword ? EyeOff : Eye" class="w-5 h-5" />
-            </button>
-          </div>
+          <PasswordInput
+            v-model="form.password"
+            label="Password"
+            autocomplete="new-password"
+            required
+          />
           <div class="mt-3">
             <div class="flex items-center justify-between text-sm text-gray-600 mb-1">
               <span>Password strength</span>
@@ -209,25 +202,14 @@ async function onRegister() {
           </div>
         </div>
         <div>
-          <label class="block text-gray-700 mb-1 font-medium">Confirm Password</label>
-          <div class="relative">
-            <input
-              v-model="form.password_confirm"
-              :type="showPasswordConf ? 'text' : 'password'"
-              required
-              autocomplete="new-password"
-              @focus="confirmFocused = true"
-              @blur="confirmTouched = true"
-            />
-            <button
-              type="button"
-              @click="showPasswordConf = !showPasswordConf"
-              class="absolute right-2 top-1/2 -translate-y-1/2 text-blue-600 hover:text-blue-800 p-1"
-              aria-label="Toggle password visibility"
-            >
-              <component :is="showPasswordConf ? EyeOff : Eye" class="w-5 h-5" />
-            </button>
-          </div>
+          <PasswordInput
+            v-model="form.password_confirm"
+            label="Confirm Password"
+            autocomplete="new-password"
+            required
+            @focus="confirmFocused = true"
+            @blur="confirmTouched = true"
+          />
           <div v-if="showConfirmMismatch" class="text-sm font-semibold text-red-600 mt-2">
             Passwords do not match.
           </div>
