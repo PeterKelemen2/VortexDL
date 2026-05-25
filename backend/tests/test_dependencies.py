@@ -64,6 +64,60 @@ async def test_get_current_user_with_valid_token_and_sid_sets_current_session_id
 
 
 @pytest.mark.asyncio
+async def test_get_current_user_with_valid_token_without_sid_sets_current_session_id_none():
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        role = Role(name="user", description="Default user role")
+        session.add(role)
+        await session.commit()
+        await session.refresh(role)
+
+        user = User(
+            username="nosiduser",
+            email="nosid@example.com",
+            hashed_password=hash_password("Password123!"),
+            role=role,
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+        token = create_access_token(
+            data={"sub": str(user.id), "role": "user"},
+            secret=settings.JWT_SECRET,
+            expires_delta=timedelta(minutes=15),
+            issuer=settings.JWT_ISSUER,
+            audience=settings.JWT_AUDIENCE,
+            algorithm=settings.JWT_ALGORITHM,
+        )
+
+        result = await get_current_user(token=token, db=session)
+        assert result.id == user.id
+        assert getattr(result, "current_session_id") is None
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_user_not_found_raises_401():
+    async with async_session() as session:
+        token = create_access_token(
+            data={"sub": "999999", "role": "user"},
+            secret=settings.JWT_SECRET,
+            expires_delta=timedelta(minutes=15),
+            issuer=settings.JWT_ISSUER,
+            audience=settings.JWT_AUDIENCE,
+            algorithm=settings.JWT_ALGORITHM,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user(token=token, db=session)
+
+        assert exc_info.value.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_get_current_user_missing_sub_raises_401():
     async with async_session() as session:
         token = create_access_token(

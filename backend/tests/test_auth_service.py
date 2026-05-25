@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 from sqlalchemy import select, text
 from sqlalchemy.orm import selectinload
+from types import SimpleNamespace
 
 from app.core.config import settings
 from app.core.db import async_session
@@ -460,6 +461,84 @@ async def test_bootstrap_initial_admin_elevates_existing_user_when_force_elevate
         persisted = result.scalar_one_or_none()
         assert persisted is not None
         assert persisted.role_id == existing_roles["admin"].id
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_initial_admin_skips_existing_admin_with_admin_role(monkeypatch):
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_USERNAME", "bootstrapadmin")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_EMAIL", "bootstrap@example.com")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_PASSWORD", "Password123!")
+    monkeypatch.setattr(settings, "ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING", False)
+
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        existing_roles = await ensure_roles_exist(session)
+        admin_role = existing_roles["admin"]
+        admin_user = User(
+            username="bootstrapadmin",
+            email="bootstrap@example.com",
+            hashed_password=hash_password("Password123!"),
+            role_id=admin_role.id,
+        )
+        session.add(admin_user)
+        await session.commit()
+        await session.refresh(admin_user)
+
+        await bootstrap_initial_admin(session)
+
+        stmt = select(User).where(User.username == "bootstrapadmin")
+        result = await session.execute(stmt)
+        persisted = result.scalar_one_or_none()
+        assert persisted is not None
+        assert persisted.role_id == admin_role.id
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_initial_admin_skips_existing_admin_path_for_existing_user_branch(monkeypatch):
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_USERNAME", "bootstrapadmin")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_EMAIL", "bootstrap@example.com")
+    monkeypatch.setattr(settings, "INITIAL_ADMIN_PASSWORD", "Password123!")
+    monkeypatch.setattr(settings, "ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING", False)
+
+    admin_role = SimpleNamespace(id=1, name="admin", description="Administrator role")
+    user_role = SimpleNamespace(id=2, name="user", description="Default user role")
+    existing_user = SimpleNamespace(role_id=admin_role.id, username="bootstrapadmin")
+
+    class FakeResult:
+        def __init__(self, value):
+            self._value = value
+
+        def scalar_one_or_none(self):
+            return self._value
+
+    class FakeSession:
+        def __init__(self):
+            self.calls = 0
+
+        async def execute(self, stmt):
+            self.calls += 1
+            if self.calls == 1:
+                return FakeResult(None)
+            if self.calls == 2:
+                return FakeResult(existing_user)
+            raise AssertionError("Unexpected query in FakeSession")
+
+        async def commit(self):
+            pass
+
+        async def refresh(self, instance):
+            pass
+
+    async def fake_ensure_roles_exist(db):
+        return {"admin": admin_role, "user": user_role}
+
+    monkeypatch.setattr("app.services.auth_service.ensure_roles_exist", fake_ensure_roles_exist)
+
+    fake_session = FakeSession()
+    await bootstrap_initial_admin(fake_session)
 
 
 @pytest.mark.asyncio
