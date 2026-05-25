@@ -60,7 +60,7 @@ const profileMenuItems = [
               <button
                 type="button"
                 @click="toggle"
-                class="flex items-center justify-center text-sm font-semibold bg-blue-300 text-gray-100 hover:text-blue-00 transition-colors size-8 rounded-full hover:bg-blue-500"
+                class="flex h-8 w-8 items-center justify-center rounded-full bg-blue-400 text-sm font-semibold leading-none text-white transition-colors hover:bg-blue-500 active:bg-blue-700"
               >
                 {{ useUserInitials(auth.user.username) }}
               </button>
