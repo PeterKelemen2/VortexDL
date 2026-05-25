@@ -54,29 +54,16 @@ const activeProfileImage = computed(() => auth.user?.profile_image ?? null)
 const activeProfileImageUrl = computed(() => {
   const image = activeProfileImage.value
   if (!image) return null
-  return resolveBackendUrl(image.url || image.file_path)
+  return resolveBackendUrl(image.avatar_url || image.url || image.file_path)
 })
 
 const profileImageStyle = computed(() => {
-  const image = activeProfileImage.value
-  if (
-    !image ||
-    image.crop_x == null ||
-    image.crop_y == null ||
-    image.crop_size == null ||
-    image.original_width == null ||
-    image.original_height == null
-  ) {
-    return null
-  }
-
-  const containerSize = 96
-  const scale = containerSize / image.crop_size
-
+  const imageUrl = activeProfileImageUrl.value
+  if (!imageUrl) return null
   return {
-    backgroundImage: `url('${activeProfileImageUrl.value}')`,
-    backgroundSize: `${image.original_width * scale}px ${image.original_height * scale}px`,
-    backgroundPosition: `${-image.crop_x * scale}px ${-image.crop_y * scale}px`,
+    backgroundImage: `url('${imageUrl}')`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
     width: '100%',
     height: '100%',
@@ -99,34 +86,23 @@ const selectedImageToActivate = ref(null)
 const activationError = ref('')
 const activationInProgress = ref(false)
 
-function buildCropPreviewStyle(image, containerSize) {
-  if (
-    !image ||
-    image.crop_x == null ||
-    image.crop_y == null ||
-    image.crop_size == null ||
-    image.original_width == null ||
-    image.original_height == null
-  ) {
-    return null
-  }
-
-  const imageUrl = resolveBackendUrl(image.url || image.file_path)
-  const scale = containerSize / image.crop_size
-
+function buildVariantPreviewStyle(imageUrl) {
+  if (!imageUrl) return null
   return {
-    backgroundImage: `url('${imageUrl}')`,
-    backgroundSize: `${image.original_width * scale}px ${image.original_height * scale}px`,
-    backgroundPosition: `${-image.crop_x * scale}px ${-image.crop_y * scale}px`,
+    backgroundImage: `url('${resolveBackendUrl(imageUrl)}')`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
     width: '100%',
     height: '100%',
   }
 }
 
-const selectedImagePreviewStyle = computed(() =>
-  buildCropPreviewStyle(selectedImageToActivate.value, 280),
-)
+const selectedImagePreviewStyle = computed(() => {
+  const image = selectedImageToActivate.value
+  if (!image) return null
+  return buildVariantPreviewStyle(image.preview_url || image.url || image.file_path)
+})
 
 async function loadRecentProfileImages() {
   if (!auth.user) {
@@ -470,8 +446,8 @@ async function updatePassword() {
           >
             <div class="relative h-16 w-16 overflow-hidden rounded-full bg-slate-100">
               <div
-                v-if="buildCropPreviewStyle(image, 64)"
-                :style="buildCropPreviewStyle(image, 64)"
+                v-if="image.thumbnail_url"
+                :style="buildVariantPreviewStyle(image.thumbnail_url)"
                 class="h-full w-full"
               />
               <img

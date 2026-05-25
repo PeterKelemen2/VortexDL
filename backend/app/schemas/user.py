@@ -18,6 +18,9 @@ class UserImageRead(BaseModel):
     id: int
     url: str
     file_path: str
+    avatar_url: str | None = None
+    thumbnail_url: str | None = None
+    preview_url: str | None = None
     original_filename: str
     mime_type: str
     original_width: int | None

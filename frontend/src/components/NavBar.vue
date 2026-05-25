@@ -16,28 +16,17 @@ const showMenu = ref(false)
 const activeProfileImageUrl = computed(() => {
   const image = auth.user?.profile_image
   if (!image) return null
-  return resolveBackendUrl(image.url || image.file_path)
+  return resolveBackendUrl(image.avatar_url || image.url || image.file_path)
 })
 
 const avatarStyle = computed(() => {
-  const image = auth.user?.profile_image
-  if (
-    !image ||
-    image.crop_x == null ||
-    image.crop_y == null ||
-    image.crop_size == null ||
-    image.original_width == null ||
-    image.original_height == null
-  ) {
-    return null
-  }
+  const imageUrl = activeProfileImageUrl.value
+  if (!imageUrl) return null
 
-  const buttonSize = 40
-  const scale = buttonSize / image.crop_size
   return {
-    backgroundImage: `url('${activeProfileImageUrl.value}')`,
-    backgroundSize: `${image.original_width * scale}px ${image.original_height * scale}px`,
-    backgroundPosition: `${-image.crop_x * scale}px ${-image.crop_y * scale}px`,
+    backgroundImage: `url('${imageUrl}')`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
     width: '100%',
     height: '100%',

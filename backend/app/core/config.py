@@ -25,6 +25,13 @@ class Settings:
     PROFILE_IMAGE_UPLOAD_SUBDIR = os.getenv("PROFILE_IMAGE_UPLOAD_SUBDIR", "profile_images")
     PROFILE_IMAGE_URL_PATH = os.getenv("PROFILE_IMAGE_URL_PATH", "/uploads")
     PROFILE_IMAGE_MAX_SIZE_MB = int(os.getenv("PROFILE_IMAGE_MAX_SIZE_MB", "5"))
+    PROFILE_IMAGE_VARIANT_SIZES = {
+        "avatar": int(os.getenv("PROFILE_IMAGE_VARIANT_AVATAR_SIZE", "120")),
+        "thumbnail": int(os.getenv("PROFILE_IMAGE_VARIANT_THUMBNAIL_SIZE", "200")),
+        "preview": int(os.getenv("PROFILE_IMAGE_VARIANT_PREVIEW_SIZE", "420")),
+    }
+    PROFILE_IMAGE_VARIANT_QUALITY = int(os.getenv("PROFILE_IMAGE_VARIANT_QUALITY", "85"))
+    PROFILE_IMAGE_VARIANT_SEPARATOR = os.getenv("PROFILE_IMAGE_VARIANT_SEPARATOR", "__")
     CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if origin.strip()]
 
 settings = Settings()
