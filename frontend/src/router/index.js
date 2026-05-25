@@ -7,15 +7,17 @@ import AdminView from '@/views/AdminView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import ForbiddenView from '@/views/ForbiddenView.vue'
 import { useAuthStore } from '@/stores/auth'
+import { setLucideFavicon } from '@/utils/favicon'
+import { BRAND_NAME, BRAND_ICON } from '@/constants/branding'
 
 const routes = [
-  { path: '/', name: 'home', component: HomeView, meta: { requiresAuth: true } },
-  { path: '/profile', name: 'profile', component: ProfileView, meta: { requiresAuth: true } },
-  { path: '/admin', name: 'admin', component: AdminView, meta: { requiresAuth: true, requiresAdmin: true } },
-  { path: '/not-found', name: 'not-found', component: NotFoundView },
-  { path: '/forbidden', name: 'forbidden', component: ForbiddenView },
-  { path: '/register', name: 'register', component: RegisterView, meta: { guestOnly: true } },
-  { path: '/login', name: 'login', component: LoginView, meta: { guestOnly: true } },
+  { path: '/', name: 'home', component: HomeView, meta: { title: '', requiresAuth: true } },
+  { path: '/profile', name: 'profile', component: ProfileView, meta: { title: 'Profile', requiresAuth: true } },
+  { path: '/admin', name: 'admin', component: AdminView, meta: { title: 'Admin', requiresAuth: true, requiresAdmin: true } },
+  { path: '/not-found', name: 'not-found', component: NotFoundView, meta: { title: 'Not Found' } },
+  { path: '/forbidden', name: 'forbidden', component: ForbiddenView, meta: { title: 'Forbidden' } },
+  { path: '/register', name: 'register', component: RegisterView, meta: { title: 'Register', guestOnly: true } },
+  { path: '/login', name: 'login', component: LoginView, meta: { title: 'Login', guestOnly: true } },
   { path: '/:pathMatch(.*)*', redirect: '/not-found' },
 ]
 
@@ -41,6 +43,15 @@ router.beforeEach(async (to) => {
   }
 
   return true
+})
+
+setLucideFavicon(BRAND_ICON)
+
+router.afterEach((to) => {
+  const title = to.meta.title && typeof to.name === 'string' ?
+    `${to.meta.title} | ${BRAND_NAME}` :
+    BRAND_NAME
+  document.title = title
 })
 
 export default router

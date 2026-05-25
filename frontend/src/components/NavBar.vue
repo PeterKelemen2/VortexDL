@@ -2,9 +2,10 @@
 import { ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LogOut, ShieldCheck, User, Shield, Home, ChevronDown } from 'lucide-vue-next'
+import { LogOut, ShieldCheck, User } from 'lucide-vue-next'
 import Dropdown from '@/components/Dropdown.vue'
 import { useUserInitials } from '@/composables/useUserInitials'
+import { BRAND_NAME, BRAND_ROUTE, BRAND_ICON } from '@/constants/branding'
 
 const router = useRouter()
 const route = useRoute()
@@ -42,11 +43,11 @@ const profileMenuItems = [
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
       <!-- Brand -->
       <router-link
-        to="/"
+        :to="BRAND_ROUTE"
         class="flex items-center gap-2 font-bold text-lg text-blue-600 hover:text-blue-800 transition-colors"
       >
-        <Home class="w-5 h-5" />
-        <span>yt-dlp Client</span>
+        <component :is="BRAND_ICON" class="w-5 h-5" />
+        <span>{{ BRAND_NAME }}</span>
       </router-link>
 
       <!-- Right side -->
