@@ -198,7 +198,7 @@ onMounted(async () => {
 <template>
   <section class="space-y-6">
     <section class="rounded-3xl border border-gray-200 bg-white p-4 lg:p-6 shadow-sm">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
         <div>
           <h2 class="text-xl font-semibold text-slate-900">User management</h2>
           <p class="text-sm text-slate-600 mt-1">
@@ -251,35 +251,35 @@ onMounted(async () => {
               </thead>
               <tbody class="divide-y divide-gray-200 bg-white">
                 <tr v-for="user in users" :key="user.id">
-                  <td class="px-4 py-4 text-sm text-slate-700">{{ user.username }}</td>
-                  <td class="px-4 py-4 text-sm text-slate-500 wrap-break-word">{{ user.email }}</td>
-                  <td class="px-4 py-4 text-sm text-slate-700">{{ user.role }}</td>
-                  <td class="px-4 py-4 text-sm text-right text-slate-700">
+                  <td class="px-4 py-3 text-sm text-slate-700">{{ user.username }}</td>
+                  <td class="px-4 py-3 text-sm text-slate-500 wrap-break-word">{{ user.email }}</td>
+                  <td class="px-4 py-3 text-sm text-slate-700">{{ user.role }}</td>
+                  <td class="px-4 py-3 text-sm text-right text-slate-700">
                     <div class="flex flex-wrap justify-end gap-2">
                       <button
                         type="button"
-                        class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                        class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
                         @click="openAction(user, 'editUsername')"
                       >
                         Edit name
                       </button>
                       <button
                         type="button"
-                        class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                        class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
                         @click="openAction(user, 'changePassword')"
                       >
                         Change password
                       </button>
                       <button
                         type="button"
-                        class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                        class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
                         @click="openAction(user, 'changeRole')"
                       >
                         Change role
                       </button>
                       <button
                         type="button"
-                        class="inline-flex items-center rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition hover:bg-red-100"
+                        class="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100"
                         @click="openAction(user, 'deleteUser')"
                       >
                         Delete
