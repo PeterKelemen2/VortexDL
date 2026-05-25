@@ -52,25 +52,31 @@ const profileMenuItems = [
 
       <!-- Right side -->
       <div class="flex items-center gap-3">
-        <router-link
+        <!-- <router-link
           v-if="auth.isAdmin"
           to="/admin"
           class="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors px-2 py-1 rounded-md hover:bg-blue-50"
         >
           <ShieldCheck class="w-4 h-4" />
           Admin
-        </router-link>
+        </router-link> -->
 
         <div v-if="auth.user?.username" class="relative">
           <Dropdown :items="profileMenuItems">
             <template #trigger="{ toggle }">
-              <button
-                type="button"
-                @click="toggle"
-                class="flex h-8 w-8 items-center justify-center rounded-full bg-blue-400 text-sm font-semibold leading-none text-white transition-colors hover:bg-blue-500 active:bg-blue-700"
-              >
-                {{ useUserInitials(auth.user.username) }}
-              </button>
+              <div class="relative inline-flex">
+                <button
+                  type="button"
+                  @click="toggle"
+                  class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-400 text-sm font-semibold leading-none text-white transition-colors hover:bg-blue-500 active:bg-blue-700"
+                >
+                  {{ useUserInitials(auth.user.username) }}
+                </button>
+                <ShieldCheck
+                  v-if="auth.isAdmin"
+                  class="absolute -bottom-px -right-1.5 h-5 w-5 rounded-full bg-white text-blue-600 border border-white shadow-sm"
+                />
+              </div>
             </template>
           </Dropdown>
         </div>
