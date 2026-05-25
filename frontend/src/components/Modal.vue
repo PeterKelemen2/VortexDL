@@ -81,7 +81,7 @@ onBeforeUnmount(() => {
     >
       <div
         v-if="isVisible"
-        class="relative w-full max-w-2xl overflow-hidden rounded-3xl bg-white p-6 shadow-2xl shadow-black/10 ring-1 ring-slate-200 sm:p-8"
+        class="relative w-full max-w-2xl overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl shadow-black/10 ring-1 ring-slate-200 sm:p-8"
         @click.stop
       >
         <button
