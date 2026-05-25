@@ -1,7 +1,9 @@
 <script setup>
-import { computed, ref, reactive, watch } from 'vue'
+import { computed, ref, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/utils/api'
+import Modal from '@/components/Modal.vue'
 import PasswordInput from '@/components/PasswordInput.vue'
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter.vue'
 import TextInput from '@/components/TextInput.vue'
@@ -22,7 +24,20 @@ const passwordForm = reactive({
 const passwordFocused = ref(false)
 const confirmFocused = ref(false)
 const confirmTouched = ref(false)
+const showUnsavedModal = ref(false)
+const pendingRouteLeave = ref(null)
+const originalUsername = ref(auth.user?.username ?? '')
 const { isPasswordValid } = usePasswordStrength(computed(() => passwordForm.newPassword))
+const hasProfileChanges = computed(
+  () => profileForm.username.trim() !== (originalUsername.value ?? ''),
+)
+const hasPasswordChanges = computed(
+  () =>
+    Boolean(passwordForm.currentPassword) ||
+    Boolean(passwordForm.newPassword) ||
+    Boolean(passwordForm.newPasswordConfirm),
+)
+const hasUnsavedChanges = computed(() => hasProfileChanges.value || hasPasswordChanges.value)
 const showConfirmMismatch = computed(
   () =>
     isPasswordValid.value &&
@@ -52,10 +67,52 @@ watch(
   () => auth.user?.username,
   (username) => {
     if (username) {
+      originalUsername.value = username
       profileForm.username = username
     }
   },
 )
+
+function confirmNavigation() {
+  if (pendingRouteLeave.value) {
+    pendingRouteLeave.value(true)
+  }
+  pendingRouteLeave.value = null
+  showUnsavedModal.value = false
+}
+
+function cancelNavigation() {
+  if (pendingRouteLeave.value) {
+    pendingRouteLeave.value(false)
+  }
+  pendingRouteLeave.value = null
+  showUnsavedModal.value = false
+}
+
+function handleBeforeUnload(event) {
+  if (hasUnsavedChanges.value) {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', handleBeforeUnload)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+})
+
+onBeforeRouteLeave((to, from, next) => {
+  if (!hasUnsavedChanges.value) {
+    next()
+    return
+  }
+
+  showUnsavedModal.value = true
+  pendingRouteLeave.value = next
+})
 
 async function updateProfile() {
   resetProfileFeedback()
@@ -81,6 +138,7 @@ async function updateProfile() {
       auth.setAccessToken,
     )
     auth.user = updatedUser
+    originalUsername.value = updatedUser.username
     profileSuccess.value = 'Username updated successfully.'
     profileForm.currentPassword = ''
   } catch (e) {
@@ -238,5 +296,39 @@ async function updatePassword() {
         </div>
       </div>
     </section>
+
+    <Modal
+      :model-value="showUnsavedModal"
+      title="Unsaved changes"
+      @update:modelValue="
+        (value) => {
+          showUnsavedModal = value
+          if (!value) cancelNavigation()
+        }
+      "
+      @close="cancelNavigation"
+    >
+      <div class="space-y-4">
+        <p class="text-sm text-slate-700">
+          You have unsaved changes. Are you sure you want to leave and discard them?
+        </p>
+        <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            class="btn bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
+            @click="cancelNavigation"
+          >
+            Stay
+          </button>
+          <button
+            type="button"
+            class="btn bg-primary text-white hover:bg-primary-dark"
+            @click="confirmNavigation"
+          >
+            Leave anyway
+          </button>
+        </div>
+      </div>
+    </Modal>
   </section>
 </template>
