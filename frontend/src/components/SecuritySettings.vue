@@ -1,38 +1,80 @@
 <script setup>
+import { ref, onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { api } from '@/utils/api'
 import Modal from '@/components/Modal.vue'
 
-const props = defineProps({
-  sessions: {
-    type: Array,
-    required: true,
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  error: {
-    type: String,
-    default: '',
-  },
-  successMessage: {
-    type: String,
-    default: '',
-  },
-  revokingSessionId: {
-    type: [String, Number],
-    default: null,
-  },
-  pendingRevokeSession: {
-    type: Object,
-    default: null,
-  },
-  showConfirmModal: {
-    type: Boolean,
-    default: false,
-  },
-})
+const auth = useAuthStore()
 
-const emit = defineEmits(['open-revoke-modal', 'confirm-revoke-session', 'cancel-revoke'])
+const sessions = ref([])
+const loading = ref(false)
+const error = ref('')
+const successMessage = ref('')
+const revokingSessionId = ref(null)
+const pendingRevokeSession = ref(null)
+const showConfirmModal = ref(false)
+
+async function loadSessions() {
+  loading.value = true
+  error.value = ''
+  successMessage.value = ''
+  try {
+    const token = auth.accessToken
+    sessions.value = await api.getSessions(token, auth.setAccessToken)
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    loading.value = false
+  }
+}
+
+function openRevokeModal(session) {
+  pendingRevokeSession.value = session
+  showConfirmModal.value = true
+}
+
+async function revokeSession(session) {
+  if (!auth.accessToken) {
+    error.value = 'Unable to revoke session: not authenticated.'
+    return
+  }
+
+  const sessionId = session.id
+  const isCurrentSession = Boolean(session.current)
+
+  revokingSessionId.value = sessionId
+  error.value = ''
+  successMessage.value = ''
+
+  try {
+    await api.revokeSession(sessionId, auth.accessToken, auth.setAccessToken)
+    if (isCurrentSession) {
+      await auth.logout()
+      window.location.href = '/login'
+      return
+    }
+    successMessage.value = 'Session revoked successfully.'
+    await loadSessions()
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    revokingSessionId.value = null
+    pendingRevokeSession.value = null
+    showConfirmModal.value = false
+  }
+}
+
+async function confirmRevokeSession() {
+  if (!pendingRevokeSession.value) return
+  await revokeSession(pendingRevokeSession.value)
+}
+
+function cancelRevoke() {
+  pendingRevokeSession.value = null
+  showConfirmModal.value = false
+}
+
+onMounted(loadSessions)
 </script>
 
 <template>
@@ -95,7 +137,7 @@ const emit = defineEmits(['open-revoke-modal', 'confirm-revoke-session', 'cancel
             <button
               class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
               :disabled="revokingSessionId === session.id"
-              @click="$emit('open-revoke-modal', session)"
+              @click="openRevokeModal(session)"
             >
               <span v-if="revokingSessionId === session.id">Revoking…</span>
               <span v-else>
@@ -110,8 +152,13 @@ const emit = defineEmits(['open-revoke-modal', 'confirm-revoke-session', 'cancel
     <Modal
       :model-value="showConfirmModal"
       title="Revoke session"
-      @update:modelValue="$emit('cancel-revoke')"
-      @close="$emit('cancel-revoke')"
+      @update:modelValue="
+        (value) => {
+          showConfirmModal.value = value
+          if (!value) cancelRevoke()
+        }
+      "
+      @close="cancelRevoke"
     >
       <div class="space-y-4">
         <p class="text-sm text-slate-700">Are you sure you want to revoke this session?</p>
@@ -129,7 +176,7 @@ const emit = defineEmits(['open-revoke-modal', 'confirm-revoke-session', 'cancel
           <button
             type="button"
             class="btn bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
-            @click="$emit('cancel-revoke')"
+            @click="cancelRevoke"
           >
             Cancel
           </button>
@@ -137,7 +184,7 @@ const emit = defineEmits(['open-revoke-modal', 'confirm-revoke-session', 'cancel
             type="button"
             class="btn bg-primary text-white hover:bg-primary-dark"
             :disabled="revokingSessionId === pendingRevokeSession?.id"
-            @click="$emit('confirm-revoke-session')"
+            @click="confirmRevokeSession"
           >
             {{ revokingSessionId === pendingRevokeSession?.id ? 'Revoking…' : 'Confirm revoke' }}
           </button>

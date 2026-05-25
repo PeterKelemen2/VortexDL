@@ -1,44 +1,107 @@
 <script setup>
-const props = defineProps({
-  profileForm: {
-    type: Object,
-    required: true,
-  },
-  passwordForm: {
-    type: Object,
-    required: true,
-  },
-  authUser: {
-    type: Object,
-    required: false,
-  },
-  profileError: {
-    type: String,
-    default: '',
-  },
-  profileSuccess: {
-    type: String,
-    default: '',
-  },
-  passwordError: {
-    type: String,
-    default: '',
-  },
-  passwordSuccess: {
-    type: String,
-    default: '',
-  },
-  profileSubmitting: {
-    type: Boolean,
-    default: false,
-  },
-  passwordSubmitting: {
-    type: Boolean,
-    default: false,
-  },
+import { ref, reactive, watch } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { api } from '@/utils/api'
+
+const auth = useAuthStore()
+
+const profileForm = reactive({
+  username: auth.user?.username ?? '',
+  currentPassword: '',
+})
+const passwordForm = reactive({
+  currentPassword: '',
+  newPassword: '',
+  newPasswordConfirm: '',
 })
 
-const emit = defineEmits(['update-profile', 'update-password'])
+const profileError = ref('')
+const profileSuccess = ref('')
+const passwordError = ref('')
+const passwordSuccess = ref('')
+const profileSubmitting = ref(false)
+const passwordSubmitting = ref(false)
+
+function resetProfileFeedback() {
+  profileError.value = ''
+  profileSuccess.value = ''
+}
+
+function resetPasswordFeedback() {
+  passwordError.value = ''
+  passwordSuccess.value = ''
+}
+
+watch(
+  () => auth.user?.username,
+  (username) => {
+    if (username) {
+      profileForm.username = username
+    }
+  },
+)
+
+async function updateProfile() {
+  resetProfileFeedback()
+  if (!auth.user) {
+    profileError.value = 'Unable to update profile: not authenticated.'
+    return
+  }
+
+  const trimmedUsername = profileForm.username.trim()
+  if (trimmedUsername === auth.user.username) {
+    profileError.value = 'No changes were made.'
+    return
+  }
+
+  profileSubmitting.value = true
+  try {
+    const updatedUser = await api.updateCurrentUser(
+      {
+        username: trimmedUsername,
+        current_password: profileForm.currentPassword,
+      },
+      auth.accessToken,
+      auth.setAccessToken,
+    )
+    auth.user = updatedUser
+    profileSuccess.value = 'Username updated successfully.'
+    profileForm.currentPassword = ''
+  } catch (e) {
+    profileError.value = e.message
+  } finally {
+    profileSubmitting.value = false
+  }
+}
+
+async function updatePassword() {
+  resetPasswordFeedback()
+  if (!passwordForm.newPassword) {
+    passwordError.value = 'Enter a new password.'
+    return
+  }
+
+  passwordSubmitting.value = true
+  try {
+    await api.updateCurrentUser(
+      {
+        current_password: passwordForm.currentPassword,
+        new_password: passwordForm.newPassword,
+        new_password_confirm: passwordForm.newPasswordConfirm,
+      },
+      auth.accessToken,
+      auth.setAccessToken,
+    )
+    passwordSuccess.value = 'Password updated successfully.'
+    passwordForm.currentPassword = ''
+    passwordForm.newPassword = ''
+    passwordForm.newPasswordConfirm = ''
+  } catch (e) {
+    passwordError.value = e.message
+  } finally {
+    passwordSubmitting.value = false
+  }
+}
 </script>
 
 <template>
@@ -76,14 +139,13 @@ const emit = defineEmits(['update-profile', 'update-password'])
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p class="text-sm text-slate-600">
-            Your current username is <strong>{{ authUser?.username }}</strong
-            >.
+            Your current username is <strong>{{ auth.user?.username }}</strong>.
           </p>
           <button
             type="button"
             class="inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="profileSubmitting"
-            @click="$emit('update-profile')"
+            @click="updateProfile"
           >
             {{ profileSubmitting ? 'Saving…' : 'Save changes' }}
           </button>
@@ -152,7 +214,7 @@ const emit = defineEmits(['update-profile', 'update-password'])
             type="button"
             class="inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="passwordSubmitting"
-            @click="$emit('update-password')"
+            @click="updatePassword"
           >
             {{ passwordSubmitting ? 'Updating…' : 'Update password' }}
           </button>
