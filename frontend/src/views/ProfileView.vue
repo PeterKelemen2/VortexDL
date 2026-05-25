@@ -38,9 +38,9 @@ function selectMenuItem(item) {
 
 <template>
   <div class="max-w-7xl mx-auto min-h-[calc(100vh-57px)] overflow-hidden">
-    <div class="grid gap-6 lg:grid-cols-[240px_1fr] h-full">
+    <div class="grid gap-6 lg:grid-cols-[240px_1fr] min-h-full">
       <aside
-        class="overflow-hidden border-b border-gray-200 bg-white pt-4 lg:border-b-0 lg:border-x lg:sticky lg:top-0 lg:self-start lg:h-full"
+        class="overflow-hidden border-b border-gray-200 bg-white pt-4 lg:border-b-0 lg:border-x lg:sticky lg:top-0 lg:self-start lg:min-h-[calc(100vh-57px)]"
       >
         <div class="mb-6 border-b border-gray-200 pb-2">
           <h3>Settings</h3>
@@ -64,12 +64,12 @@ function selectMenuItem(item) {
         </nav>
       </aside>
 
-      <main class="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl">
+      <main class="flex min-h-full flex-col overflow-hidden rounded-3xl">
         <!-- <div class="border-b border-gray-200 bg-white px-6 py-5">
           <h2>{{ selectedItem.label }} settings</h2>
         </div> -->
 
-        <section class="h-full min-h-0 overflow-auto py-6 px-4">
+        <section class="flex-1 min-h-0 overflow-auto py-6 px-4">
           <component :is="selectedItem.component" />
         </section>
       </main>
