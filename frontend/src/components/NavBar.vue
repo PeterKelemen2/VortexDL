@@ -73,15 +73,6 @@ const profileMenuItems = [
             </template>
           </Dropdown>
         </div>
-
-        <button
-          @click="onLogout"
-          class="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-red-600 transition-colors px-2 py-1 rounded-md hover:bg-red-50"
-          title="Logout"
-        >
-          <LogOut class="w-4 h-4" />
-          <span class="hidden sm:block">Logout</span>
-        </button>
       </div>
     </div>
   </nav>
