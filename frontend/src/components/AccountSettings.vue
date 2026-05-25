@@ -10,6 +10,7 @@ import PasswordStrengthMeter from '@/components/PasswordStrengthMeter.vue'
 import TextInput from '@/components/TextInput.vue'
 import ProfileImageCropper from '@/components/ProfileImageCropper.vue'
 import { usePasswordStrength } from '@/composables/usePasswordStrength'
+import { useUserInitials } from '@/composables/useUserInitials'
 
 const auth = useAuthStore()
 
@@ -92,6 +93,53 @@ const uploadError = ref('')
 const uploadInProgress = ref(false)
 const showCropModal = ref(false)
 const currentUpload = ref(null)
+const recentProfileImages = ref([])
+const showActivateModal = ref(false)
+const selectedImageToActivate = ref(null)
+const activationError = ref('')
+const activationInProgress = ref(false)
+
+function buildCropPreviewStyle(image, containerSize) {
+  if (
+    !image ||
+    image.crop_x == null ||
+    image.crop_y == null ||
+    image.crop_size == null ||
+    image.original_width == null ||
+    image.original_height == null
+  ) {
+    return null
+  }
+
+  const imageUrl = resolveBackendUrl(image.url || image.file_path)
+  const scale = containerSize / image.crop_size
+
+  return {
+    backgroundImage: `url('${imageUrl}')`,
+    backgroundSize: `${image.original_width * scale}px ${image.original_height * scale}px`,
+    backgroundPosition: `${-image.crop_x * scale}px ${-image.crop_y * scale}px`,
+    backgroundRepeat: 'no-repeat',
+    width: '100%',
+    height: '100%',
+  }
+}
+
+const selectedImagePreviewStyle = computed(() =>
+  buildCropPreviewStyle(selectedImageToActivate.value, 280),
+)
+
+async function loadRecentProfileImages() {
+  if (!auth.user) {
+    recentProfileImages.value = []
+    return
+  }
+
+  try {
+    recentProfileImages.value = await api.listProfileImages(auth.accessToken, auth.setAccessToken)
+  } catch {
+    recentProfileImages.value = []
+  }
+}
 
 function revokeCurrentUploadPreview() {
   if (currentUpload.value?.previewUrl) {
@@ -155,6 +203,7 @@ async function handleCropSave(cropData) {
     if (auth.user) {
       auth.user.profile_image = updatedImage
     }
+    await loadRecentProfileImages()
     showCropModal.value = false
     revokeCurrentUploadPreview()
     currentUpload.value = null
@@ -169,6 +218,49 @@ function handleCropCancel() {
   showCropModal.value = false
   revokeCurrentUploadPreview()
   currentUpload.value = null
+}
+
+function selectImageToActivate(image) {
+  selectedImageToActivate.value = image
+  activationError.value = ''
+  showActivateModal.value = true
+}
+
+function cancelActivate() {
+  showActivateModal.value = false
+  selectedImageToActivate.value = null
+  activationError.value = ''
+}
+
+async function confirmActivateImage() {
+  if (!selectedImageToActivate.value) return
+
+  activationInProgress.value = true
+  activationError.value = ''
+
+  try {
+    const updatedImage = await api.activateProfileImage(
+      selectedImageToActivate.value.id,
+      auth.accessToken,
+      auth.setAccessToken,
+    )
+    if (auth.user) {
+      auth.user.profile_image = updatedImage
+    }
+    await loadRecentProfileImages()
+    cancelActivate()
+  } catch (error) {
+    activationError.value = error.message
+  } finally {
+    activationInProgress.value = false
+  }
+}
+
+function setShowActivateModal(value) {
+  showActivateModal.value = value
+  if (!value) {
+    cancelActivate()
+  }
 }
 
 function setShowCropModal(value) {
@@ -189,6 +281,14 @@ watch(
       profileForm.username = username
     }
   },
+)
+
+watch(
+  () => auth.user?.id,
+  () => {
+    loadRecentProfileImages()
+  },
+  { immediate: true },
 )
 
 function confirmNavigation() {
@@ -322,9 +422,9 @@ async function updatePassword() {
             />
             <div
               v-else
-              class="flex h-full w-full items-center justify-center bg-blue-400 text-white text-lg font-semibold"
+              class="flex h-full w-full items-center justify-center bg-blue-400 text-white text-3xl font-semibold"
             >
-              {{ auth.user ? auth.user.username.charAt(0).toUpperCase() : '' }}
+              {{ useUserInitials(auth.user.username) }}
             </div>
           </div>
         </div>
@@ -355,6 +455,37 @@ async function updatePassword() {
             {{ uploadError }}
           </p>
         </div>
+      </div>
+
+      <div v-if="recentProfileImages.length > 1" class="mt-6">
+        <h3 class="text-sm font-semibold text-slate-900 mb-3">Recent profile photos</h3>
+        <div class="flex gap-3 pb-1">
+          <button
+            v-for="image in recentProfileImages.slice(0, 5)"
+            :key="image.id"
+            type="button"
+            class="shrink-0 rounded-full border p-1 transition hover:border-slate-400"
+            :class="image.is_active ? 'border-primary ring-2 ring-primary/20' : 'border-slate-200'"
+            @click="selectImageToActivate(image)"
+          >
+            <div class="relative h-16 w-16 overflow-hidden rounded-full bg-slate-100">
+              <div
+                v-if="buildCropPreviewStyle(image, 64)"
+                :style="buildCropPreviewStyle(image, 64)"
+                class="h-full w-full"
+              />
+              <img
+                v-else
+                :src="resolveBackendUrl(image.url || image.file_path)"
+                alt="Recent profile image"
+                class="h-full w-full object-cover"
+              />
+            </div>
+          </button>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">
+          Click a previous image to preview and restore it as your current profile photo.
+        </p>
       </div>
     </section>
 
@@ -489,6 +620,62 @@ async function updatePassword() {
           @cancel="handleCropCancel"
         />
       </template>
+    </Modal>
+
+    <Modal
+      :model-value="showActivateModal"
+      title="Restore previous photo"
+      @update:modelValue="setShowActivateModal"
+      @close="cancelActivate"
+    >
+      <div class="space-y-4">
+        <p class="text-sm text-slate-600">
+          Review the selected previous image before restoring it as your current profile photo.
+        </p>
+        <div
+          class="mx-auto h-72 w-72 overflow-hidden rounded-full border border-slate-200 bg-slate-100"
+        >
+          <div
+            v-if="selectedImagePreviewStyle"
+            :style="selectedImagePreviewStyle"
+            class="h-full w-full"
+          />
+          <img
+            v-else-if="selectedImageToActivate"
+            :src="
+              resolveBackendUrl(selectedImageToActivate.url || selectedImageToActivate.file_path)
+            "
+            alt="Selected profile image"
+            class="h-full w-full object-cover"
+          />
+          <div v-else class="flex h-full w-full items-center justify-center text-slate-500">
+            No image selected.
+          </div>
+        </div>
+        <p
+          v-if="activationError"
+          class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {{ activationError }}
+        </p>
+        <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            class="inline-flex justify-center rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-200"
+            @click="cancelActivate"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="inline-flex justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="activationInProgress"
+            @click="confirmActivateImage"
+          >
+            {{ activationInProgress ? 'Restoring…' : 'Use this photo' }}
+          </button>
+        </div>
+      </div>
     </Modal>
 
     <Modal

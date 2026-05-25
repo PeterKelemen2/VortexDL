@@ -157,6 +157,11 @@ const api = {
     token,
     onTokenRefresh,
   }),
+  activateProfileImage: (imageId, token, onTokenRefresh) => requestWithAuth(`/auth/me/avatar/${imageId}/activate`, {
+    method: 'PATCH',
+    token,
+    onTokenRefresh,
+  }),
   listProfileImages: (token, onTokenRefresh) => requestWithAuth('/auth/me/avatars', {
     token,
     onTokenRefresh,

@@ -26,6 +26,7 @@ from app.services.auth_service import (
     update_current_user,
 )
 from app.services.user_image_service import (
+    activate_user_profile_image,
     create_user_profile_image,
     list_user_profile_images,
     update_user_profile_image_crop,
@@ -245,6 +246,17 @@ async def crop_profile_image(
 ):
     _require_csrf(request)
     return await update_user_profile_image_crop(current_user, image_id, crop_request, db)
+
+
+@router.patch("/me/avatar/{image_id}/activate", response_model=UserImageRead)
+async def activate_profile_image(
+    image_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_csrf(request)
+    return await activate_user_profile_image(current_user, image_id, db)
 
 
 @router.get("/me/avatars", response_model=list[UserImageRead])

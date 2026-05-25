@@ -29,9 +29,37 @@ def _get_user_image_subpath(user_id: int, filename: str) -> str:
 
 
 async def list_user_profile_images(current_user: User, db: AsyncSession) -> list[UserImage]:
-    stmt = select(UserImage).where(UserImage.user_id == current_user.id).order_by(UserImage.created_at)
+    stmt = select(UserImage).where(UserImage.user_id == current_user.id).order_by(UserImage.created_at.desc())
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+async def activate_user_profile_image(current_user: User, image_id: int, db: AsyncSession) -> UserImage:
+    stmt = select(UserImage).where(UserImage.id == image_id, UserImage.user_id == current_user.id)
+    result = await db.execute(stmt)
+    image_record = result.scalar_one_or_none()
+    if image_record is None:
+        raise HTTPException(status_code=404, detail="Profile image not found.")
+
+    if (
+        image_record.crop_x is None or
+        image_record.crop_y is None or
+        image_record.crop_size is None or
+        image_record.original_width is None or
+        image_record.original_height is None
+    ):
+        raise HTTPException(status_code=400, detail="Cannot activate an image without saved crop metadata.")
+
+    await db.execute(
+        update(UserImage)
+        .where(UserImage.user_id == current_user.id, UserImage.is_active == True)
+        .values(is_active=False)
+    )
+
+    image_record.is_active = True
+    await db.commit()
+    await db.refresh(image_record)
+    return image_record
 
 
 async def create_user_profile_image(current_user: User, upload_file: UploadFile, db: AsyncSession) -> UserImage:
