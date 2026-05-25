@@ -122,7 +122,10 @@ const api = {
     token,
     onTokenRefresh,
   }),
-  listUsers: (token, onTokenRefresh) => requestWithAuth('/admin/users', { token, onTokenRefresh }),
+  listUsers: (page, pageSize, token, onTokenRefresh) => requestWithAuth(
+    `/admin/users?page=${page}&page_size=${pageSize}`,
+    { token, onTokenRefresh },
+  ),
   getAdminRoles: (token, onTokenRefresh) => requestWithAuth('/admin/roles', { token, onTokenRefresh }),
   updateUserByAdmin: (userId, payload, token, onTokenRefresh) => requestWithAuth(`/admin/users/${userId}`, {
     method: 'PATCH',

@@ -24,6 +24,14 @@ class UserRead(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserListResponse(BaseModel):
+    items: list[UserRead]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
 class UserUpdate(BaseModel):
     username: str | None = None
     current_password: str | None = None

@@ -218,6 +218,47 @@ async def test_admin_route_unauthenticated_returns_401(client):
     assert response.status_code == 401
 
 
+async def test_admin_users_route_supports_pagination(client):
+    await create_admin_user(username="adminuser", email="admin@example.com", password="Admin123!")
+    login_response = await client.post("/auth/login", json=login_payload(username="adminuser", password="Admin123!"))
+    assert login_response.status_code == 200
+
+    async with async_session() as session:
+        statement = select(Role).where(Role.name == "user")
+        result = await session.execute(statement)
+        user_role = result.scalar_one_or_none()
+        if user_role is None:
+            user_role = Role(name="user", description="Default user role")
+            session.add(user_role)
+            await session.commit()
+            await session.refresh(user_role)
+
+        for i in range(1, 12):
+            session.add(
+                User(
+                    username=f"user{i}",
+                    email=f"user{i}@example.com",
+                    hashed_password=hash_password("Password123!"),
+                    role_id=user_role.id,
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
+                )
+            )
+        await session.commit()
+
+    response = await client.get(
+        "/admin/users?page=2&page_size=5",
+        headers={"Authorization": f"Bearer {login_response.json()['access_token']}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["page"] == 2
+    assert response.json()["page_size"] == 5
+    assert response.json()["total"] == 12
+    assert response.json()["total_pages"] == 3
+    assert len(response.json()["items"]) == 5
+
+
 async def test_logout_requires_csrf_token(client):
     await client.post("/auth/register", json=register_payload())
     await client.post("/auth/login", json=login_payload())
@@ -383,9 +424,11 @@ async def test_admin_route_allows_admin_users(client):
         headers={"Authorization": f"Bearer {access_token}"},
     )
     assert response.status_code == 200
-    users = response.json()
-    assert isinstance(users, list)
-    assert any(user["username"] == "adminuser" for user in users)
+    data = response.json()
+    assert data["page"] == 1
+    assert data["page_size"] == 20
+    assert data["total"] >= 1
+    assert any(user["username"] == "adminuser" for user in data["items"])
 
 
 async def test_register_duplicate_username_and_email(client):

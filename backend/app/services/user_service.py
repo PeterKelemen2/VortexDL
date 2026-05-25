@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from datetime import datetime, timezone
@@ -8,21 +8,40 @@ from app.models.role import Role
 from app.schemas.user import UserRead, UserAdminUpdate, UserAdminDelete
 from app.services.auth_service import validate_password_strength, hash_password
 
-async def get_all_users(db: AsyncSession):
-    stmt = select(User).options(selectinload(User.role))
+async def get_all_users(db: AsyncSession, page: int = 1, page_size: int = 10):
+    count_stmt = select(func.count()).select_from(User)
+    result = await db.execute(count_stmt)
+    total = result.scalar_one()
+
+    offset = (page - 1) * page_size
+    stmt = (
+        select(User)
+        .options(selectinload(User.role))
+        .order_by(User.id)
+        .limit(page_size)
+        .offset(offset)
+    )
     result = await db.execute(stmt)
     users = result.scalars().all()
-    return [
-        UserRead(
-            id=user.id,
-            username=user.username,
-            email=user.email,
-            role=user.role.name,
-            created_at=user.created_at,
-            updated_at=user.updated_at,
-        )
-        for user in users
-    ]
+
+    total_pages = max((total + page_size - 1) // page_size, 1)
+    return {
+        'items': [
+            UserRead(
+                id=user.id,
+                username=user.username,
+                email=user.email,
+                role=user.role.name,
+                created_at=user.created_at,
+                updated_at=user.updated_at,
+            )
+            for user in users
+        ],
+        'page': page,
+        'page_size': page_size,
+        'total': total,
+        'total_pages': total_pages,
+    }
 
 
 async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:

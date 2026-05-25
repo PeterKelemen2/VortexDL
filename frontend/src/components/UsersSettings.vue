@@ -13,6 +13,10 @@ const loadingUsers = ref(false)
 const loadingRoles = ref(false)
 const pageError = ref('')
 const pageSuccess = ref('')
+const currentPage = ref(1)
+const pageSize = ref(5)
+const totalPages = ref(1)
+const totalUsers = ref(0)
 
 const modalOpen = ref(false)
 const currentAction = ref('')
@@ -89,11 +93,25 @@ function closeModal() {
   resetActionState()
 }
 
-async function loadUsers() {
+async function loadUsers(page = currentPage.value) {
   loadingUsers.value = true
   pageError.value = ''
   try {
-    users.value = await api.listUsers(auth.accessToken, auth.setAccessToken)
+    const response = await api.listUsers(
+      page,
+      pageSize.value,
+      auth.accessToken,
+      auth.setAccessToken,
+    )
+    users.value = response.items
+    currentPage.value = response.page
+    totalPages.value = response.total_pages
+    totalUsers.value = response.total
+    if (currentPage.value > totalPages.value && totalPages.value > 0) {
+      currentPage.value = totalPages.value
+      await loadUsers(currentPage.value)
+      return
+    }
   } catch (error) {
     pageError.value = error.message || 'Unable to load users.'
   } finally {
@@ -189,6 +207,22 @@ async function submitAction() {
   }
 }
 
+function goToPage(page) {
+  if (page < 1 || page > totalPages.value || page === currentPage.value) {
+    return
+  }
+  currentPage.value = page
+  loadUsers(page)
+}
+
+function previousPage() {
+  goToPage(currentPage.value - 1)
+}
+
+function nextPage() {
+  goToPage(currentPage.value + 1)
+}
+
 onMounted(async () => {
   if (!auth.isAdmin) return
   await Promise.all([loadUsers(), loadRoles()])
@@ -229,7 +263,9 @@ onMounted(async () => {
       </div>
 
       <div v-else class="mt-6">
-        <div v-if="loadingUsers" class="text-center py-8 text-slate-600">Loading users…</div>
+        <div v-if="loadingUsers && users.length === 0" class="text-center py-8 text-slate-600">
+          Loading users…
+        </div>
 
         <div
           v-else-if="users.length === 0"
@@ -238,109 +274,152 @@ onMounted(async () => {
           No users found.
         </div>
 
-        <div v-else class="space-y-4">
-          <div class="space-y-4 sm:hidden">
+        <transition name="fade" mode="out-in">
+          <div :key="currentPage" class="space-y-4">
             <div
-              v-for="user in users"
-              :key="user.id"
-              class="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm"
+              v-if="loadingUsers"
+              class="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700"
             >
-              <div class="flex flex-col gap-3">
-                <div class="flex items-start justify-between gap-4">
-                  <div>
-                    <p class="text-base font-semibold text-slate-900">{{ user.username }}</p>
-                    <p class="text-sm text-slate-500 break-words">{{ user.email }}</p>
+              Loading page {{ currentPage }}…
+            </div>
+            <div class="space-y-4 sm:hidden">
+              <div
+                v-for="user in users"
+                :key="user.id"
+                class="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm"
+              >
+                <div class="flex flex-col gap-3">
+                  <div class="flex items-start justify-between gap-4">
+                    <div>
+                      <p class="text-base font-semibold text-slate-900">{{ user.username }}</p>
+                      <p class="text-sm text-slate-500 break-words">{{ user.email }}</p>
+                    </div>
+                    <span
+                      class="whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700"
+                    >
+                      {{ user.role }}
+                    </span>
                   </div>
-                  <span
-                    class="whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700"
-                  >
-                    {{ user.role }}
-                  </span>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    class="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                    @click="openAction(user, 'editUsername')"
-                  >
-                    Edit name
-                  </button>
-                  <button
-                    type="button"
-                    class="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                    @click="openAction(user, 'changePassword')"
-                  >
-                    Change password
-                  </button>
-                  <button
-                    type="button"
-                    class="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                    @click="openAction(user, 'changeRole')"
-                  >
-                    Change role
-                  </button>
-                  <button
-                    type="button"
-                    class="w-full rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-left text-sm font-medium text-red-700 transition hover:bg-red-100"
-                    @click="openAction(user, 'deleteUser')"
-                  >
-                    Delete
-                  </button>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      class="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      @click="openAction(user, 'editUsername')"
+                    >
+                      Edit name
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      @click="openAction(user, 'changePassword')"
+                    >
+                      Change password
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      @click="openAction(user, 'changeRole')"
+                    >
+                      Change role
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-left text-sm font-medium text-red-700 transition hover:bg-red-100"
+                      @click="openAction(user, 'deleteUser')"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div class="hidden sm:block overflow-auto rounded-3xl border border-gray-200">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Username</th>
-                  <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Email</th>
-                  <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Role</th>
-                  <th class="px-4 py-3 text-right text-sm font-semibold text-slate-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-200 bg-white">
-                <tr v-for="user in users" :key="user.id">
-                  <td class="px-4 py-3 text-sm text-slate-700">{{ user.username }}</td>
-                  <td class="px-4 py-3 text-sm text-slate-500 wrap-break-word">{{ user.email }}</td>
-                  <td class="px-4 py-3 text-sm text-slate-700">{{ user.role }}</td>
-                  <td class="px-4 py-3 text-sm text-right text-slate-700">
-                    <div class="flex flex-wrap justify-end gap-2">
-                      <button
-                        type="button"
-                        class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                        @click="openAction(user, 'editUsername')"
-                      >
-                        Edit name
-                      </button>
-                      <button
-                        type="button"
-                        class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                        @click="openAction(user, 'changePassword')"
-                      >
-                        Change password
-                      </button>
-                      <button
-                        type="button"
-                        class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                        @click="openAction(user, 'changeRole')"
-                      >
-                        Change role
-                      </button>
-                      <button
-                        type="button"
-                        class="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100"
-                        @click="openAction(user, 'deleteUser')"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="hidden sm:block overflow-auto rounded-3xl border border-gray-200">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">
+                      Username
+                    </th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Email</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Role</th>
+                    <th class="px-4 py-3 text-right text-sm font-semibold text-slate-700">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white">
+                  <tr v-for="user in users" :key="user.id">
+                    <td class="px-4 py-3 text-sm text-slate-700">{{ user.username }}</td>
+                    <td class="px-4 py-3 text-sm text-slate-500 wrap-break-word">
+                      {{ user.email }}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-slate-700">{{ user.role }}</td>
+                    <td class="px-4 py-3 text-sm text-right text-slate-700">
+                      <div class="flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                          @click="openAction(user, 'editUsername')"
+                        >
+                          Edit name
+                        </button>
+                        <button
+                          type="button"
+                          class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                          @click="openAction(user, 'changePassword')"
+                        >
+                          Change password
+                        </button>
+                        <button
+                          type="button"
+                          class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                          @click="openAction(user, 'changeRole')"
+                        >
+                          Change role
+                        </button>
+                        <button
+                          type="button"
+                          class="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100"
+                          @click="openAction(user, 'deleteUser')"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </transition>
+
+        <div
+          class="mt-4 flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p class="text-sm text-slate-600">
+            Showing page {{ currentPage }} of {{ totalPages }} — {{ totalUsers }} user{{
+              totalUsers === 1 ? '' : 's'
+            }}
+            total.
+          </p>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="currentPage <= 1"
+              @click="previousPage"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="currentPage >= totalPages"
+              @click="nextPage"
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>
@@ -446,4 +525,17 @@ onMounted(async () => {
   </section>
 </template>
 
-<style scoped></style>
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+.fade-enter-to,
+.fade-leave-from {
+  opacity: 1;
+}
+</style>

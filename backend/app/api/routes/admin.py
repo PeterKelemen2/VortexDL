@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.dependencies import require_role, get_db, get_current_user
 from app.models.role import Role
 from app.models.user import User
-from app.schemas.user import UserRead, UserAdminUpdate, UserAdminDelete
+from app.schemas.user import UserRead, UserListResponse, UserAdminUpdate, UserAdminDelete
 from app.schemas.role import RoleRead
 from app.services.user_service import get_all_users, update_user_by_admin, delete_user_by_admin
 
@@ -22,12 +22,14 @@ def _require_csrf(request: Request) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid CSRF token")
 
 
-@router.get("/users", response_model=List[UserRead])
+@router.get("/users", response_model=UserListResponse)
 async def list_users(
     db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     _: None = Depends(require_role("admin")),
 ):
-    return await get_all_users(db)
+    return await get_all_users(db, page, page_size)
 
 
 @router.get("/roles", response_model=List[RoleRead])

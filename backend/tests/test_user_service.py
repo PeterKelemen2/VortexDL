@@ -16,8 +16,12 @@ async def test_get_all_users_returns_empty_list():
         await session.execute(text("DELETE FROM roles"))
         await session.commit()
 
-        users = await get_all_users(session)
-        assert users == []
+        result = await get_all_users(session)
+        assert result["items"] == []
+        assert result["page"] == 1
+        assert result["page_size"] == 20
+        assert result["total"] == 0
+        assert result["total_pages"] == 1
 
 
 @pytest.mark.asyncio
@@ -42,12 +46,49 @@ async def test_get_all_users_returns_user_read_objects():
         await session.commit()
         await session.refresh(user)
 
-        users = await get_all_users(session)
-        assert len(users) == 1
-        assert isinstance(users[0], UserRead)
-        assert users[0].username == "service1"
-        assert users[0].email == "service1@example.com"
-        assert users[0].role == "user"
+        result = await get_all_users(session)
+        assert result["page"] == 1
+        assert result["page_size"] == 20
+        assert result["total"] == 1
+        assert result["total_pages"] == 1
+        assert len(result["items"]) == 1
+        assert isinstance(result["items"][0], UserRead)
+        assert result["items"][0].username == "service1"
+        assert result["items"][0].email == "service1@example.com"
+        assert result["items"][0].role == "user"
+
+
+@pytest.mark.asyncio
+async def test_get_all_users_supports_pagination():
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM users"))
+        await session.execute(text("DELETE FROM roles"))
+        await session.commit()
+
+        role = Role(name="user", description="Default user role")
+        session.add(role)
+        await session.commit()
+        await session.refresh(role)
+
+        for i in range(1, 16):
+            session.add(
+                User(
+                    username=f"service{i}",
+                    email=f"service{i}@example.com",
+                    hashed_password="irrelevant",
+                    role=role,
+                )
+            )
+        await session.commit()
+
+        response = await get_all_users(session, page=2, page_size=5)
+
+        assert response["page"] == 2
+        assert response["page_size"] == 5
+        assert response["total"] == 15
+        assert response["total_pages"] == 3
+        assert len(response["items"]) == 5
+        assert response["items"][0].username == "service6"
 
 
 @pytest.mark.asyncio

@@ -264,14 +264,14 @@ async def bootstrap_initial_admin(db: AsyncSession):
     existing = await ensure_roles_exist(db)
     admin_role = existing["admin"]
 
-    stmt = select(User).where(User.role_id == admin_role.id)
+    stmt = select(User).where(User.role_id == admin_role.id).limit(1)
     result = await db.execute(stmt)
     admin_user = result.scalar_one_or_none()
     if admin_user is not None:
         logger.debug("Admin bootstrap skipped because an admin account already exists: %s", admin_user.username)
         return
 
-    stmt = select(User).where((User.username == username) | (User.email == email))
+    stmt = select(User).where((User.username == username) | (User.email == email)).limit(1)
     result = await db.execute(stmt)
     existing_user = result.scalar_one_or_none()
 
