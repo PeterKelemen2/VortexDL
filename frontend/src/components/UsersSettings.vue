@@ -17,6 +17,8 @@ const currentPage = ref(1)
 const pageSize = ref(5)
 const totalPages = ref(1)
 const totalUsers = ref(0)
+const pageDirection = ref('left')
+const pageKey = ref(0)
 
 const modalOpen = ref(false)
 const currentAction = ref('')
@@ -107,6 +109,7 @@ async function loadUsers(page = currentPage.value) {
     currentPage.value = response.page
     totalPages.value = response.total_pages
     totalUsers.value = response.total
+    pageKey.value += 1
     if (currentPage.value > totalPages.value && totalPages.value > 0) {
       currentPage.value = totalPages.value
       await loadUsers(currentPage.value)
@@ -211,7 +214,7 @@ function goToPage(page) {
   if (page < 1 || page > totalPages.value || page === currentPage.value) {
     return
   }
-  currentPage.value = page
+  pageDirection.value = page > currentPage.value ? 'left' : 'right'
   loadUsers(page)
 }
 
@@ -246,7 +249,7 @@ onMounted(async () => {
         v-if="pageError"
         class="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
       >
-        {{ pageError }}
+        Something went wrong.
       </div>
       <div
         v-if="pageSuccess"
@@ -274,14 +277,14 @@ onMounted(async () => {
           No users found.
         </div>
 
-        <transition name="fade" mode="out-in">
-          <div :key="currentPage" class="space-y-4">
-            <div
+        <transition :name="'slide-' + pageDirection" mode="out-in">
+          <div :key="pageKey" class="space-y-4">
+            <!-- <div
               v-if="loadingUsers"
               class="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700"
             >
               Loading page {{ currentPage }}…
-            </div>
+            </div> -->
             <div class="space-y-4 sm:hidden">
               <div
                 v-for="user in users"
@@ -526,16 +529,36 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.15s ease;
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition:
+    transform 0.25s ease,
+    opacity 0.25s ease;
 }
-.fade-enter-from,
-.fade-leave-to {
+
+.slide-left-enter-from,
+.slide-right-leave-to {
   opacity: 0;
+  transform: translateX(100%);
 }
-.fade-enter-to,
-.fade-leave-from {
+
+.slide-left-enter-to,
+.slide-right-leave-from {
   opacity: 1;
+  transform: translateX(0);
+}
+
+.slide-left-leave-from,
+.slide-right-enter-to {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.slide-left-leave-to,
+.slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-100%);
 }
 </style>
