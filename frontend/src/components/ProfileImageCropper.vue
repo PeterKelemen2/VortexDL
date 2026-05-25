@@ -15,7 +15,7 @@ const props = defineProps({
 const emit = defineEmits(['save', 'cancel'])
 
 const containerSize = 360
-const cropViewportSize = 280
+const cropViewportSize = 360
 const imageNaturalWidth = ref(0)
 const imageNaturalHeight = ref(0)
 const baseScale = ref(1)
@@ -187,13 +187,13 @@ watch(
           style="
             background: radial-gradient(
               circle at center,
-              transparent 140px,
-              rgba(0, 0, 0, 0.55) 141px
+              transparent 180px,
+              rgba(0, 0, 0, 0.55) 181px
             );
           "
         >
           <div class="absolute inset-0 flex items-center justify-center">
-            <div class="h-70 w-70 rounded-full border-4 border-white/90 bg-transparent"></div>
+            <div class="h-90 w-90 rounded-full border-4 border-white/90 bg-transparent"></div>
           </div>
         </div>
       </div>
