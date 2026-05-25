@@ -2,7 +2,9 @@
 import { ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LogOut, ShieldCheck, Home, ChevronDown } from 'lucide-vue-next'
+import { LogOut, ShieldCheck, User, Shield, Home, ChevronDown } from 'lucide-vue-next'
+import Dropdown from '@/components/Dropdown.vue'
+import { useUserInitials } from '@/composables/useUserInitials'
 
 const router = useRouter()
 const route = useRoute()
@@ -21,9 +23,12 @@ async function onLogout() {
   router.push('/login')
 }
 
-function goTo(tab) {
-  router.push({ name: 'profile', query: { tab } })
-}
+const profileMenuItems = [
+  { label: 'Profile', route: 'profile', query: { tab: 'profile' }, icon: User },
+  { label: 'Security', route: 'profile', query: { tab: 'security' }, icon: Shield },
+  { separator: true },
+  { label: 'Log out', route: 'logout', icon: LogOut },
+]
 </script>
 
 <template>
@@ -50,33 +55,17 @@ function goTo(tab) {
         </router-link>
 
         <div v-if="auth.user?.username" class="relative">
-          <button
-            type="button"
-            @click="showMenu = !showMenu"
-            class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-blue-700 transition-colors px-2 py-1 rounded-md hover:bg-blue-50"
-          >
-            {{ auth.user.username }}
-            <ChevronDown class="w-4 h-4" />
-          </button>
-          <div
-            v-if="showMenu"
-            class="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
-          >
-            <button
-              type="button"
-              @click="goTo('profile')"
-              class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            >
-              Profile
-            </button>
-            <button
-              type="button"
-              @click="goTo('security')"
-              class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            >
-              Security
-            </button>
-          </div>
+          <Dropdown :items="profileMenuItems">
+            <template #trigger="{ toggle }">
+              <button
+                type="button"
+                @click="toggle"
+                class="flex items-center justify-center text-sm font-semibold bg-blue-300 text-gray-100 hover:text-blue-00 transition-colors size-8 rounded-full hover:bg-blue-500"
+              >
+                {{ useUserInitials(auth.user.username) }}
+              </button>
+            </template>
+          </Dropdown>
         </div>
 
         <button
