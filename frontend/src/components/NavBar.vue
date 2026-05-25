@@ -25,7 +25,7 @@ async function onLogout() {
 }
 
 const profileMenuItems = [
-  { label: 'Settings', route: 'settings', query: { tab: 'settings' }, icon: Settings },
+  { label: 'Settings', route: 'settings', query: { tab: 'account' }, icon: Settings },
   // { label: 'Security', route: 'profile', query: { tab: 'security' }, icon: Shield },
   { separator: true },
   {
