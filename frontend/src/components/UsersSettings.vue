@@ -20,6 +20,7 @@ const totalUsers = ref(0)
 const pageDirection = ref('left')
 const pageKey = ref(0)
 const initialPageLoad = ref(true)
+const pageSizeOptions = [5, 10, 20]
 
 const transitionName = computed(() => (initialPageLoad.value ? '' : `slide-${pageDirection.value}`))
 
@@ -126,6 +127,13 @@ async function loadUsers(page = currentPage.value) {
   } finally {
     loadingUsers.value = false
   }
+}
+
+function changePageSize(newSize) {
+  pageSize.value = newSize
+  currentPage.value = 1
+  pageDirection.value = 'left'
+  loadUsers(1)
 }
 
 async function loadRoles() {
@@ -406,12 +414,26 @@ onMounted(async () => {
         <div
           class="mt-4 flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-between"
         >
-          <p class="text-sm text-slate-600">
-            Showing page {{ currentPage }} of {{ totalPages }} — {{ totalUsers }} user{{
-              totalUsers === 1 ? '' : 's'
-            }}
-            total.
-          </p>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <p class="text-sm text-slate-600">
+              Showing page {{ currentPage }} of {{ totalPages }} — {{ totalUsers }} user{{
+                totalUsers === 1 ? '' : 's'
+              }}
+              total.
+            </p>
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-medium text-slate-700">Page size</label>
+              <select
+                v-model.number="pageSize"
+                @change="changePageSize(pageSize)"
+                class="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+              >
+                <option v-for="size in pageSizeOptions" :key="size" :value="size">
+                  {{ size }}
+                </option>
+              </select>
+            </div>
+          </div>
           <div class="flex items-center gap-2">
             <button
               type="button"
