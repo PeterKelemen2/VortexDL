@@ -2,12 +2,19 @@
 import logging
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_db, get_current_user
 from app.core.config import settings
 from app.schemas.auth import TokenResponse, TokenRefreshRequest, RefreshTokenSession
-from app.schemas.user import UserRead, UserRegister, UserLogin, UserUpdate
+from app.schemas.user import (
+    UserImageCrop,
+    UserImageRead,
+    UserLogin,
+    UserRead,
+    UserRegister,
+    UserUpdate,
+)
 from app.services.auth_service import (
     register_user,
     refresh_tokens,
@@ -17,6 +24,11 @@ from app.services.auth_service import (
     revoke_all_refresh_sessions,
     get_user_info,
     update_current_user,
+)
+from app.services.user_image_service import (
+    create_user_profile_image,
+    list_user_profile_images,
+    update_user_profile_image_crop,
 )
 from app.models.user import User
 
@@ -210,3 +222,34 @@ async def update_me(
 ):
     _require_csrf(request)
     return await update_current_user(current_user, user_update, db)
+
+
+@router.post("/me/avatar", response_model=UserImageRead)
+async def upload_profile_image(
+    request: Request,
+    image: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_csrf(request)
+    return await create_user_profile_image(current_user, image, db)
+
+
+@router.patch("/me/avatar/{image_id}", response_model=UserImageRead)
+async def crop_profile_image(
+    image_id: int,
+    crop_request: UserImageCrop,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_csrf(request)
+    return await update_user_profile_image_crop(current_user, image_id, crop_request, db)
+
+
+@router.get("/me/avatars", response_model=list[UserImageRead])
+async def list_profile_images(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await list_user_profile_images(current_user, db)

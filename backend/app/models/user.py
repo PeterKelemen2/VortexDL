@@ -9,6 +9,7 @@ from app.core.db import Base
 if TYPE_CHECKING:
     from app.models.refresh_token import RefreshToken
     from app.models.role import Role
+    from app.models.user_image import UserImage
 
 class User(Base):
     __tablename__ = "users"
@@ -21,3 +22,8 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     role: Mapped["Role"] = relationship("Role", back_populates="users")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship("RefreshToken", back_populates="user")
+    images: Mapped[list["UserImage"]] = relationship(
+        "UserImage",
+        back_populates="user",
+        order_by="UserImage.created_at",
+    )

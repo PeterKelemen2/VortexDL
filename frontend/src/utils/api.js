@@ -44,7 +44,13 @@ async function request(path, { method = 'GET', body, headers = {}, token } = {})
     credentials: 'include',
   }
 
-  if (body) opts.body = JSON.stringify(body)
+  if (body instanceof FormData) {
+    delete opts.headers['Content-Type']
+    opts.body = body
+  } else if (body) {
+    opts.body = JSON.stringify(body)
+  }
+
   if (token) opts.headers['Authorization'] = `Bearer ${token}`
 
   const sanitizedBody = body ? sanitizeBody(body) : null
@@ -136,6 +142,22 @@ const api = {
   deleteUserByAdmin: (userId, payload, token, onTokenRefresh) => requestWithAuth(`/admin/users/${userId}`, {
     method: 'DELETE',
     body: payload,
+    token,
+    onTokenRefresh,
+  }),
+  uploadProfileImage: (formData, token, onTokenRefresh) => requestWithAuth('/auth/me/avatar', {
+    method: 'POST',
+    body: formData,
+    token,
+    onTokenRefresh,
+  }),
+  setProfileImageCrop: (imageId, payload, token, onTokenRefresh) => requestWithAuth(`/auth/me/avatar/${imageId}`, {
+    method: 'PATCH',
+    body: payload,
+    token,
+    onTokenRefresh,
+  }),
+  listProfileImages: (token, onTokenRefresh) => requestWithAuth('/auth/me/avatars', {
     token,
     onTokenRefresh,
   }),

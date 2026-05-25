@@ -478,7 +478,13 @@ async def revoke_refresh_session(session_id: int, user: User, db: AsyncSession):
 
 
 def get_user_info(current_user: User):
-    # NOTE: caller must ensure current_user.role is eagerly loaded
+    # NOTE: caller must ensure current_user.role and current_user.images are eagerly loaded
+    active_image = None
+    for image in getattr(current_user, 'images', []):
+        if image.is_active:
+            active_image = image
+            break
+
     return UserRead(
         id=current_user.id,
         username=current_user.username,
@@ -486,6 +492,7 @@ def get_user_info(current_user: User):
         role=current_user.role.name,
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
+        profile_image=active_image,
     )
 
 

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { LogOut, ShieldCheck, Settings } from 'lucide-vue-next'
@@ -11,6 +11,35 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const showMenu = ref(false)
+
+const avatarStyle = computed(() => {
+  const image = auth.user?.profile_image
+  if (
+    !image ||
+    image.crop_x == null ||
+    image.crop_y == null ||
+    image.crop_size == null ||
+    image.original_width == null ||
+    image.original_height == null
+  ) {
+    return {
+      width: '100%',
+      height: '100%',
+      objectFit: 'cover',
+    }
+  }
+
+  const buttonSize = 40
+  const scale = buttonSize / image.crop_size
+  return {
+    position: 'absolute',
+    top: '0',
+    left: '0',
+    width: `${image.original_width * scale}px`,
+    height: `${image.original_height * scale}px`,
+    transform: `translate(${-image.crop_x * scale}px, ${-image.crop_y * scale}px)`,
+  }
+})
 
 watch(
   () => route.fullPath,
@@ -68,9 +97,19 @@ const profileMenuItems = [
                 <button
                   type="button"
                   @click="toggle"
-                  class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-400 text-sm font-semibold leading-none text-white transition-colors hover:bg-blue-500 active:bg-blue-700"
+                  class="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-blue-400 text-sm font-semibold leading-none text-white transition-colors hover:bg-blue-500 active:bg-blue-700"
                 >
-                  {{ useUserInitials(auth.user.username) }}
+                  <template v-if="auth.user?.profile_image?.url">
+                    <img
+                      :src="auth.user.profile_image.url"
+                      alt="Profile"
+                      class="absolute inset-0 h-full w-full"
+                      :style="avatarStyle"
+                    />
+                  </template>
+                  <template v-else>
+                    {{ useUserInitials(auth.user.username) }}
+                  </template>
                 </button>
                 <ShieldCheck
                   v-if="auth.isAdmin"

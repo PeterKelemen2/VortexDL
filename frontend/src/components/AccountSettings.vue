@@ -7,6 +7,7 @@ import Modal from '@/components/Modal.vue'
 import PasswordInput from '@/components/PasswordInput.vue'
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter.vue'
 import TextInput from '@/components/TextInput.vue'
+import ProfileImageCropper from '@/components/ProfileImageCropper.vue'
 import { usePasswordStrength } from '@/composables/usePasswordStrength'
 
 const auth = useAuthStore()
@@ -46,12 +47,24 @@ const showConfirmMismatch = computed(
     passwordForm.newPassword !== passwordForm.newPasswordConfirm,
 )
 
+const activeProfileImage = computed(() => auth.user?.profile_image ?? null)
+
 const profileError = ref('')
 const profileSuccess = ref('')
 const passwordError = ref('')
 const passwordSuccess = ref('')
 const profileSubmitting = ref(false)
 const passwordSubmitting = ref(false)
+const uploadError = ref('')
+const uploadInProgress = ref(false)
+const showCropModal = ref(false)
+const currentUpload = ref(null)
+
+function revokeCurrentUploadPreview() {
+  if (currentUpload.value?.previewUrl) {
+    URL.revokeObjectURL(currentUpload.value.previewUrl)
+  }
+}
 
 function resetProfileFeedback() {
   profileError.value = ''
@@ -61,6 +74,78 @@ function resetProfileFeedback() {
 function resetPasswordFeedback() {
   passwordError.value = ''
   passwordSuccess.value = ''
+}
+
+function resetUploadFeedback() {
+  uploadError.value = ''
+}
+
+async function onProfileImageSelected(event) {
+  resetUploadFeedback()
+  const file = event.target.files?.[0]
+  if (!file) {
+    return
+  }
+
+  if (!file.type.startsWith('image/')) {
+    uploadError.value = 'Please select a valid image file.'
+    event.target.value = ''
+    return
+  }
+
+  const previewUrl = URL.createObjectURL(file)
+  currentUpload.value = {
+    file,
+    previewUrl,
+  }
+  showCropModal.value = true
+  event.target.value = ''
+}
+
+async function handleCropSave(cropData) {
+  if (!currentUpload.value?.file) {
+    uploadError.value = 'Unable to crop image: missing upload file.'
+    return
+  }
+
+  uploadInProgress.value = true
+  try {
+    const formData = new FormData()
+    formData.append('image', currentUpload.value.file)
+    const uploaded = await api.uploadProfileImage(formData, auth.accessToken, auth.setAccessToken)
+    const updatedImage = await api.setProfileImageCrop(
+      uploaded.id,
+      cropData,
+      auth.accessToken,
+      auth.setAccessToken,
+    )
+    if (auth.user) {
+      auth.user.profile_image = updatedImage
+    }
+    showCropModal.value = false
+    revokeCurrentUploadPreview()
+    currentUpload.value = null
+  } catch (error) {
+    uploadError.value = error.message
+  } finally {
+    uploadInProgress.value = false
+  }
+}
+
+function handleCropCancel() {
+  showCropModal.value = false
+  revokeCurrentUploadPreview()
+  currentUpload.value = null
+}
+
+function setShowCropModal(value) {
+  showCropModal.value = value
+  if (!value) handleCropCancel()
+}
+
+function setShowUnsavedModal(value) {
+  showUnsavedModal.value = value
+  if (!value) cancelNavigation()
 }
 
 watch(
@@ -182,6 +267,58 @@ async function updatePassword() {
 <template>
   <section class="space-y-6">
     <section class="rounded-3xl border border-gray-200 bg-white p-4 lg:p-6 shadow-sm">
+      <h2 class="text-xl font-semibold text-slate-900 mb-3">Profile photo</h2>
+      <p class="text-sm text-slate-600 mb-5">
+        Upload a profile image and crop it to choose what appears in the avatar button.
+      </p>
+      <div class="grid gap-5 sm:grid-cols-[auto_1fr] sm:items-center">
+        <div class="flex items-center justify-center">
+          <div class="h-24 w-24 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+            <img
+              v-if="activeProfileImage?.url"
+              :src="activeProfileImage.url"
+              alt="Current profile image"
+              class="h-full w-full object-cover"
+            />
+            <div
+              v-else
+              class="flex h-full w-full items-center justify-center bg-blue-400 text-white text-lg font-semibold"
+            >
+              {{ auth.user ? auth.user.username.charAt(0).toUpperCase() : '' }}
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div class="flex flex-wrap gap-3">
+            <label
+              class="inline-flex cursor-pointer items-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-dark"
+            >
+              Choose photo
+              <input type="file" accept="image/*" class="hidden" @change="onProfileImageSelected" />
+            </label>
+            <span
+              v-if="uploadInProgress"
+              class="inline-flex items-center rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-700"
+            >
+              Uploading…
+            </span>
+          </div>
+          <p class="text-sm text-slate-600">
+            We store the image on the backend and then crop the selected square area for your
+            avatar.
+          </p>
+          <p
+            v-if="uploadError"
+            class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            {{ uploadError }}
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="rounded-3xl border border-gray-200 bg-white p-4 lg:p-6 shadow-sm">
       <h2 class="text-xl font-semibold text-slate-900 mb-3">Change username</h2>
       <p class="text-sm text-slate-600 mb-5">
         Update your account name and confirm changes with your current password.
@@ -252,7 +389,7 @@ async function updatePassword() {
         />
         <div
           class="overflow-hidden transition-all duration-300 ease-out bg-slate-100 rounded-lg mt-2"
-          :class="passwordFocused ? 'max-h-[30rem]' : 'max-h-0'"
+          :class="passwordFocused ? 'max-h-120' : 'max-h-0'"
         >
           <PasswordStrengthMeter
             :password="passwordForm.newPassword"
@@ -299,14 +436,25 @@ async function updatePassword() {
     </section>
 
     <Modal
+      :model-value="showCropModal"
+      title="Crop profile photo"
+      @update:modelValue="setShowCropModal"
+      @close="handleCropCancel"
+    >
+      <template #default>
+        <ProfileImageCropper
+          v-if="currentUpload"
+          :image-url="currentUpload.previewUrl"
+          @save="handleCropSave"
+          @cancel="handleCropCancel"
+        />
+      </template>
+    </Modal>
+
+    <Modal
       :model-value="showUnsavedModal"
       title="Unsaved changes"
-      @update:modelValue="
-        (value) => {
-          showUnsavedModal = value
-          if (!value) cancelNavigation()
-        }
-      "
+      @update:modelValue="setShowUnsavedModal"
       @close="cancelNavigation"
     >
       <div class="space-y-4">

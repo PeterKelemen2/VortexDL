@@ -21,6 +21,10 @@ class Settings:
     INITIAL_ADMIN_EMAIL = os.getenv("INITIAL_ADMIN_EMAIL")
     INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD")
     ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING = os.getenv("ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING", "false").lower() in ("1", "true", "yes")
+    PROFILE_IMAGE_UPLOAD_DIR = os.getenv("PROFILE_IMAGE_UPLOAD_DIR", "./uploads")
+    PROFILE_IMAGE_UPLOAD_SUBDIR = os.getenv("PROFILE_IMAGE_UPLOAD_SUBDIR", "profile_images")
+    PROFILE_IMAGE_URL_PATH = os.getenv("PROFILE_IMAGE_URL_PATH", "/uploads")
+    PROFILE_IMAGE_MAX_SIZE_MB = int(os.getenv("PROFILE_IMAGE_MAX_SIZE_MB", "5"))
     CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if origin.strip()]
 
 settings = Settings()

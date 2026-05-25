@@ -32,7 +32,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    stmt = select(User).where(User.id == int(user_id)).options(selectinload(User.role))
+    stmt = select(User).where(User.id == int(user_id)).options(selectinload(User.role), selectinload(User.images))
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:
