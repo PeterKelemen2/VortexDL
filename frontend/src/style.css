@@ -60,7 +60,7 @@
   }
 
   .card {
-    @apply w-full max-w-md rounded-xl shadow-lg p-8;
+    @apply w-full max-w-sm lg:max-w-md rounded-xl border border-sky-50/40 shadow-lg p-8;
   }
 
   .btn {

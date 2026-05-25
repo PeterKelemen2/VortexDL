@@ -79,7 +79,7 @@ onMounted(loadSessions)
 
 <template>
   <section class="space-y-6">
-    <section class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+    <section class="rounded-3xl border border-gray-200 bg-white p-4 lg:p-6 shadow-sm">
       <h2 class="text-xl font-semibold text-slate-900 mb-3">Active sessions</h2>
       <p class="text-sm text-slate-600 mb-5">
         Manage your active refresh token sessions and revoke any device sessions you no longer use.
@@ -98,7 +98,7 @@ onMounted(loadSessions)
         <li
           v-for="session in sessions"
           :key="session.id"
-          class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+          class="rounded-xl border border-gray-200 bg-white p-3 lg:p-5 shadow-sm"
         >
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>

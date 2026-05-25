@@ -122,7 +122,7 @@ async function updatePassword() {
 
 <template>
   <section class="space-y-6">
-    <section class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+    <section class="rounded-3xl border border-gray-200 bg-white p-4 lg:p-6 shadow-sm">
       <h2 class="text-xl font-semibold text-slate-900 mb-3">Account</h2>
       <p class="text-sm text-slate-600 mb-5">
         Update your account name and confirm changes with your current password.
@@ -170,7 +170,7 @@ async function updatePassword() {
       </div>
     </section>
 
-    <section class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+    <section class="rounded-3xl border border-gray-200 bg-white p-4 lg:p-6 shadow-sm">
       <h2 class="text-xl font-semibold text-slate-900 mb-3">Change password</h2>
       <p class="text-sm text-slate-600 mb-5">
         Use a strong, unique password for your account. Password changes require your current

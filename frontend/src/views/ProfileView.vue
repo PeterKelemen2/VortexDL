@@ -37,10 +37,10 @@ function selectMenuItem(item) {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto px-4 h-[calc(100vh-57px)] overflow-hidden">
+  <div class="max-w-7xl mx-auto min-h-[calc(100vh-57px)] overflow-hidden">
     <div class="grid gap-6 lg:grid-cols-[240px_1fr] h-full">
       <aside
-        class="sticky top-0 self-start h-full overflow-hidden border-r border-gray-200 bg-white pt-4"
+        class="overflow-hidden border-b border-gray-200 bg-white pt-4 lg:border-b-0 lg:border-x lg:sticky lg:top-0 lg:self-start lg:h-full"
       >
         <div class="mb-6 border-b border-gray-200 pb-2">
           <h3>Settings</h3>
@@ -69,7 +69,7 @@ function selectMenuItem(item) {
           <h2>{{ selectedItem.label }} settings</h2>
         </div> -->
 
-        <section class="h-full min-h-0 overflow-auto py-6">
+        <section class="h-full min-h-0 overflow-auto py-6 px-4">
           <component :is="selectedItem.component" />
         </section>
       </main>
