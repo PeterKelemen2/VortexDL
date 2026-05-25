@@ -34,12 +34,12 @@ const displaySize = computed(() => ({
 }))
 
 const imageStyle = computed(() => ({
-  width: `${imageNaturalWidth.value}px`,
-  height: 'auto',
+  width: `${displaySize.value.width}px`,
+  height: `${displaySize.value.height}px`,
+  maxWidth: 'none',
   left: '50%',
   top: '50%',
-  transform: `translate(-50%, -50%) scale(${currentScale.value}) translate(${position.value.x}px, ${position.value.y}px)`,
-  transformOrigin: 'center center',
+  transform: `translate(calc(-50% + ${position.value.x}px), calc(-50% + ${position.value.y}px))`,
   touchAction: 'none',
 }))
 
@@ -47,13 +47,9 @@ const instructions =
   'Drag the image until the area within the circle shows the portion you want to use. Use zoom to adjust the crop size if needed.'
 
 function updateBounds(newPosition) {
-  const halfVisible = cropViewportSize / 2
-  const halfImageWidth = displaySize.value.width / 2
-  const halfImageHeight = displaySize.value.height / 2
-  const scale = currentScale.value || 1
-  const limitX = Math.max(0, (halfImageWidth - halfVisible) / scale)
-  const limitY = Math.max(0, (halfImageHeight - halfVisible) / scale)
-
+  // Position is in screen pixels; clamp so the crop circle never exposes outside the image
+  const limitX = Math.max(0, displaySize.value.width / 2 - cropViewportSize / 2)
+  const limitY = Math.max(0, displaySize.value.height / 2 - cropViewportSize / 2)
   return {
     x: Math.min(limitX, Math.max(-limitX, newPosition.x)),
     y: Math.min(limitY, Math.max(-limitY, newPosition.y)),
@@ -61,10 +57,7 @@ function updateBounds(newPosition) {
 }
 
 function centerImage() {
-  position.value = {
-    x: 0,
-    y: 0,
-  }
+  position.value = { x: 0, y: 0 }
 }
 
 function setImageDimensions(image) {
@@ -74,6 +67,11 @@ function setImageDimensions(image) {
 
   imageNaturalWidth.value = image.naturalWidth
   imageNaturalHeight.value = image.naturalHeight
+
+  // Fit the image so it fully covers the crop viewport:
+  // - If landscape (width > height), fit by height so height === cropViewportSize
+  // - If portrait (height > width), fit by width so width === cropViewportSize
+  // Math.max ensures the shorter dimension fills the viewport (cover behaviour)
   const baseScaleValue = Math.max(
     cropViewportSize / imageNaturalWidth.value,
     cropViewportSize / imageNaturalHeight.value,
@@ -100,10 +98,9 @@ function onPointerMove(event) {
   if (!dragging.value) return
   const deltaX = event.clientX - pointerStart.value.x
   const deltaY = event.clientY - pointerStart.value.y
-  const scale = currentScale.value || 1
   position.value = updateBounds({
-    x: dragStart.value.x + deltaX / scale,
-    y: dragStart.value.y + deltaY / scale,
+    x: dragStart.value.x + deltaX,
+    y: dragStart.value.y + deltaY,
   })
 }
 
@@ -122,15 +119,14 @@ function onScaleChange(event) {
 
 function save() {
   if (!imageLoaded.value) return
-  const effectiveScale = currentScale.value
-  const cropSize = Math.round(cropViewportSize / effectiveScale)
+  const S = currentScale.value
+  const cropSize = Math.round(cropViewportSize / S)
+  // position is in screen pixels; convert to original image coordinates
   const cropX = Math.round(
-    (displaySize.value.width / 2 - cropViewportSize / 2 - position.value.x * effectiveScale) /
-      effectiveScale,
+    imageNaturalWidth.value / 2 - cropViewportSize / (2 * S) - position.value.x / S,
   )
   const cropY = Math.round(
-    (displaySize.value.height / 2 - cropViewportSize / 2 - position.value.y * effectiveScale) /
-      effectiveScale,
+    imageNaturalHeight.value / 2 - cropViewportSize / (2 * S) - position.value.y / S,
   )
   emit('save', {
     crop_x: Math.max(0, cropX),
