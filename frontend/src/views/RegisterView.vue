@@ -4,7 +4,9 @@ import { useRouter } from 'vue-router'
 import { api } from '../utils/api'
 import { useAuthStore } from '@/stores/auth'
 import PasswordInput from '@/components/PasswordInput.vue'
+import PasswordStrengthMeter from '@/components/PasswordStrengthMeter.vue'
 import TextInput from '@/components/TextInput.vue'
+import { usePasswordStrength } from '@/composables/usePasswordStrength'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -14,59 +16,9 @@ const error = ref('')
 const success = ref('')
 const confirmFocused = ref(false)
 const confirmTouched = ref(false)
+const passwordFocused = ref(false)
+const { isPasswordValid } = usePasswordStrength(computed(() => form.value.password))
 
-const strengthCriteria = computed(() => {
-  const password = form.value.password || ''
-  const hasNumber = /\d/.test(password)
-  const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)
-  return [
-    { label: 'At least 12 characters', valid: password.length >= 12, mandatory: true },
-    { label: 'No spaces', valid: /^\S+$/.test(password), mandatory: true },
-    { label: 'An uppercase letter', valid: /[A-Z]/.test(password), mandatory: true },
-    { label: 'A lowercase letter', valid: /[a-z]/.test(password), mandatory: false },
-    { label: 'A number', valid: hasNumber, mandatory: false },
-    { label: 'A special character', valid: hasSpecial, mandatory: false },
-  ]
-})
-
-const passwordStrengthScore = computed(() => {
-  const password = form.value.password || ''
-  const lengthValid = password.length >= 12
-  const noSpacesValid = /^\S+$/.test(password)
-  const hasUppercase = /[A-Z]/.test(password)
-  const hasNumber = /\d/.test(password)
-  const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)
-
-  if (!lengthValid || !noSpacesValid || !hasUppercase) return 0
-  if (hasNumber && hasSpecial) return 3
-  if (hasNumber || hasSpecial) return 2
-  return 1
-})
-
-const passwordStrengthLabel = computed(() => {
-  const password = form.value.password || ''
-  if (!password) return 'Enter password'
-
-  const lengthValid = strengthCriteria.value[0].valid
-  const noSpacesValid = strengthCriteria.value[1].valid
-  const hasUppercase = strengthCriteria.value[2].valid
-  const hasNumber = strengthCriteria.value[4].valid
-  const hasSpecial = strengthCriteria.value[5].valid
-  const score = passwordStrengthScore.value
-
-  if (!lengthValid) return 'Too short'
-  if (!noSpacesValid) return 'No spaces allowed'
-  if (!hasUppercase) return 'Add an uppercase letter'
-  if (!hasNumber && !hasSpecial) return 'Add a number or special character'
-  if (score === 1) return 'Weak'
-  if (score === 2) return 'Acceptable'
-  return 'Strong'
-})
-
-const mandatoryCriteria = computed(() => strengthCriteria.value.filter((item) => item.mandatory))
-const isPasswordValid = computed(
-  () => mandatoryCriteria.value.every((item) => item.valid) && passwordStrengthScore.value >= 2,
-)
 const showConfirmMismatch = computed(
   () =>
     isPasswordValid.value &&
@@ -142,63 +94,27 @@ async function onRegister() {
     <div class="card bg-primary-light">
       <h2>Register</h2>
       <form @submit.prevent="onRegister" class="space-y-5">
-        <TextInput
-          v-model="form.username"
-          label="Username"
-          autocomplete="username"
-          required
-        />
-        <TextInput
-          v-model="form.email"
-          label="Email"
-          type="email"
-          autocomplete="email"
-          required
-        />
+        <TextInput v-model="form.username" label="Username" autocomplete="username" required />
+        <TextInput v-model="form.email" label="Email" type="email" autocomplete="email" required />
         <div>
           <PasswordInput
             v-model="form.password"
             label="Password"
             autocomplete="new-password"
             required
+            @focus="passwordFocused = true"
+            @blur="passwordFocused = false"
           />
-          <div class="mt-3">
-            <div class="flex items-center justify-between text-sm text-gray-600 mb-1">
-              <span>Password strength</span>
-              <span
-                class="font-semibold transition-colors"
-                :class="{
-                  'text-red-600': !isPasswordValid,
-                  'text-green-600': isPasswordValid,
-                }"
-                >{{ passwordStrengthLabel }}</span
-              >
-            </div>
-            <div
-              class="h-2 w-full border border-slate-300 bg-slate-200 rounded-full overflow-hidden"
-            >
-              <div
-                class="h-full rounded-full transition-all"
-                :style="{
-                  width: `${(passwordStrengthScore / 3) * 100}%`,
-                  backgroundColor: isPasswordValid
-                    ? '#16a34a'
-                    : passwordStrengthScore === 2
-                      ? '#eab308'
-                      : '#ef4444',
-                }"
-              />
-            </div>
-            <ul class="mt-2 space-y-1 text-xs text-gray-600">
-              <li
-                v-for="(rule, index) in strengthCriteria"
-                :key="index"
-                :class="rule.valid ? 'text-green-700' : 'text-gray-500'"
-              >
-                <span class="mr-2" :aria-hidden="true">{{ rule.valid ? '✓' : '•' }}</span>
-                {{ rule.label }}
-              </li>
-            </ul>
+
+          <div
+            class="overflow-hidden transition-all duration-300 ease-out bg-slate-100 rounded-lg mt-2"
+            :class="passwordFocused ? 'max-h-[30rem]' : 'max-h-0'"
+          >
+            <PasswordStrengthMeter
+              :password="form.password"
+              help-text="Password strength must meet the policy."
+              class="px-3 py-3"
+            />
           </div>
         </div>
         <div>

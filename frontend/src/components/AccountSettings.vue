@@ -1,9 +1,11 @@
 <script setup>
-import { ref, reactive, watch } from 'vue'
+import { computed, ref, reactive, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/utils/api'
 import PasswordInput from '@/components/PasswordInput.vue'
+import PasswordStrengthMeter from '@/components/PasswordStrengthMeter.vue'
 import TextInput from '@/components/TextInput.vue'
+import { usePasswordStrength } from '@/composables/usePasswordStrength'
 
 const auth = useAuthStore()
 
@@ -16,6 +18,18 @@ const passwordForm = reactive({
   newPassword: '',
   newPasswordConfirm: '',
 })
+
+const passwordFocused = ref(false)
+const confirmFocused = ref(false)
+const confirmTouched = ref(false)
+const { isPasswordValid } = usePasswordStrength(computed(() => passwordForm.newPassword))
+const showConfirmMismatch = computed(
+  () =>
+    isPasswordValid.value &&
+    (confirmFocused.value || confirmTouched.value) &&
+    passwordForm.newPasswordConfirm &&
+    passwordForm.newPassword !== passwordForm.newPasswordConfirm,
+)
 
 const profileError = ref('')
 const profileSuccess = ref('')
@@ -174,13 +188,30 @@ async function updatePassword() {
           label="New password"
           autocomplete="password-new-password"
           required
+          @focus="passwordFocused = true"
+          @blur="passwordFocused = false"
         />
+        <div
+          class="overflow-hidden transition-all duration-300 ease-out bg-slate-100 rounded-lg mt-2"
+          :class="passwordFocused ? 'max-h-[30rem]' : 'max-h-0'"
+        >
+          <PasswordStrengthMeter
+            :password="passwordForm.newPassword"
+            help-text="Choose a strong new password that meets the policy."
+            class="px-3 py-3"
+          />
+        </div>
         <PasswordInput
           v-model="passwordForm.newPasswordConfirm"
           label="Confirm new password"
           autocomplete="password-confirm-new"
           required
+          @focus="confirmFocused = true"
+          @blur="confirmTouched = true"
         />
+        <div v-if="showConfirmMismatch" class="text-sm font-semibold text-red-600 mt-2">
+          Passwords do not match.
+        </div>
 
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p class="text-sm text-slate-600">Password strength must meet the backend policy.</p>
