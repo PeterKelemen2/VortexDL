@@ -37,17 +37,26 @@ function selectMenuItem(item) {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto px-4">
-    <div class="grid gap-6 lg:grid-cols-[200px_1fr] items-start">
-      <aside class="border-r-2 border-gray-200 bg-white px-3 py-6 h-[calc(100vh-8rem)]">
-        <nav class="space-y-2">
+  <div class="max-w-7xl mx-auto px-4 h-[calc(100vh-57px)] overflow-hidden">
+    <div class="grid gap-6 lg:grid-cols-[240px_1fr] h-full">
+      <aside
+        class="sticky top-0 self-start h-full overflow-hidden border-r border-gray-200 bg-white pt-4"
+      >
+        <div class="mb-6 border-b border-gray-200 pb-2">
+          <h3>Settings</h3>
+        </div>
+
+        <nav class="space-y-2 px-2">
           <button
             v-for="item in menuItems"
             :key="item.id"
+            type="button"
             @click="selectMenuItem(item)"
             :class="[
-              'w-full rounded-lg px-3 py-2 text-left font-medium transition hover:bg-blue-50 hover:text-blue-700 active:bg-blue-200',
-              { 'bg-blue-100 text-blue-700': selectedTab === item.id },
+              'w-full rounded-md px-3 py-2 text-left text-sm font-medium transition',
+              'border border-transparent hover:border-blue-200 hover:bg-blue-100 hover:text-blue-700',
+              { 'bg-blue-50 text-blue-700 border-blue-200': selectedTab === item.id },
+              { 'text-slate-700': selectedTab !== item.id },
             ]"
           >
             {{ item.label }}
@@ -55,12 +64,16 @@ function selectMenuItem(item) {
         </nav>
       </aside>
 
-      <main class="space-y-6 h-[calc(100vh-8rem)] overflow-auto">
-        <div class="flex mt-6">
-          <h1>{{ selectedItem.label }} settings</h1>
+      <main
+        class="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-gray-200 bg-slate-50 shadow-sm"
+      >
+        <div class="border-b border-gray-200 bg-white px-6 py-5">
+          <h2>{{ selectedItem.label }} settings</h2>
         </div>
 
-        <component :is="selectedItem.component" />
+        <section class="h-full min-h-0 overflow-auto px-6 py-6">
+          <component :is="selectedItem.component" />
+        </section>
       </main>
     </div>
   </div>
