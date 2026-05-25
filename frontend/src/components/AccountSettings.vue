@@ -11,7 +11,7 @@ import TextInput from '@/components/TextInput.vue'
 import ProfileImageCropper from '@/components/ProfileImageCropper.vue'
 import { usePasswordStrength } from '@/composables/usePasswordStrength'
 import { useUserInitials } from '@/composables/useUserInitials'
-import { Edit2 } from 'lucide-vue-next'
+import { Pencil } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 
@@ -55,10 +55,7 @@ const activeProfileImage = computed(() => auth.user?.profile_image ?? null)
 const activeProfileImageUrl = computed(() => {
   const image = activeProfileImage.value
   if (!image) return null
-  return resolveBackendUrl(
-    image.avatar_url || image.url || image.file_path,
-    image.updated_at,
-  )
+  return resolveBackendUrl(image.avatar_url || image.url || image.file_path, image.updated_at)
 })
 
 const profileImageStyle = computed(() => {
@@ -467,10 +464,12 @@ async function updatePassword() {
               v-if="activeProfileImage"
               type="button"
               @click="editCurrentCrop"
-              class="absolute inset-0 flex items-center justify-center bg-slate-950/0 opacity-0 transition duration-200 hover:bg-slate-950/30 group-hover:opacity-100"
+              class="absolute inset-0 flex items-center justify-center bg-slate-950/0 opacity-0 transition duration-200 hover:bg-slate-950/30 group-hover:opacity-100 group/edit"
               aria-label="Edit crop"
             >
-              <Edit2 class="h-5 w-5 text-white" />
+              <Pencil
+                class="h-6 w-6 m-3 text-white transition-transform group-hover/edit:scale-110"
+              />
             </button>
           </div>
         </div>
