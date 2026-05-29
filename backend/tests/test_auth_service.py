@@ -284,7 +284,7 @@ async def test_refresh_tokens_rejects_invalid_credentials():
         await session.commit()
 
         with pytest.raises(Exception) as exc_info:
-            await refresh_tokens(UserLogin(username="missing", password="badpass"), session)
+            await refresh_tokens(UserLogin(username="missing", password="BadPass123456!"), session)
 
         assert exc_info.value.status_code == 401
 

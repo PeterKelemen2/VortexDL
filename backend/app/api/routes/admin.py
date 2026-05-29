@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +20,7 @@ CSRF_COOKIE_NAME = "csrf_token"
 def _require_csrf(request: Request) -> None:
     csrf_cookie = request.cookies.get(CSRF_COOKIE_NAME)
     csrf_header = request.headers.get(CSRF_HEADER_NAME)
-    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+    if not csrf_cookie or not csrf_header or not secrets.compare_digest(csrf_cookie, csrf_header):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid CSRF token")
 
 

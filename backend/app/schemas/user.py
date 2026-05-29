@@ -1,18 +1,33 @@
-from typing import Any
-from pydantic import BaseModel, EmailStr, ConfigDict
+from typing import Annotated
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from datetime import datetime
 
+# Strict types used at registration and password-change time only
+Username = Annotated[str, Field(min_length=3, max_length=64, pattern=r'^[a-zA-Z0-9_-]+$')]
+Password = Annotated[str, Field(min_length=12, max_length=128)]
+
+
 class UserBase(BaseModel):
-    username: str
+    # Login accepts whatever the user typed — no format enforcement here.
+    username: str = Field(min_length=1, max_length=255)
+
 
 class UserLogin(UserBase):
-    password: str
-    device_name: str | None = None
-    user_agent: str | None = None
+    # No min-length on password at login; the hash check handles wrong passwords.
+    password: str = Field(min_length=1, max_length=128)
+    device_name: str | None = Field(None, max_length=255)
+    user_agent: str | None = Field(None, max_length=512)
 
-class UserRegister(UserLogin):
+
+class UserRegister(BaseModel):
+    # Registration enforces strict username/password rules independently of UserLogin.
+    username: Username
+    password: Password
+    password_confirm: str = Field(min_length=1, max_length=128)
     email: EmailStr
-    password_confirm: str
+    device_name: str | None = Field(None, max_length=255)
+    user_agent: str | None = Field(None, max_length=512)
+
 
 class UserImageRead(BaseModel):
     id: int
@@ -55,25 +70,25 @@ class UserListResponse(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    username: str | None = None
-    current_password: str | None = None
-    new_password: str | None = None
-    new_password_confirm: str | None = None
+    username: Username | None = None
+    current_password: str | None = Field(None, max_length=128)
+    new_password: Password | None = None
+    new_password_confirm: str | None = Field(None, max_length=128)
 
 
 class UserImageCrop(BaseModel):
-    crop_x: float
-    crop_y: float
-    crop_size: float
-    original_width: int
-    original_height: int
+    crop_x: float = Field(ge=0)
+    crop_y: float = Field(ge=0)
+    crop_size: float = Field(gt=0)
+    original_width: int = Field(gt=0)
+    original_height: int = Field(gt=0)
 
 
 class UserAdminUpdate(BaseModel):
-    username: str | None = None
-    role: str | None = None
-    new_password: str | None = None
-    new_password_confirm: str | None = None
+    username: Username | None = None
+    role: str | None = Field(None, max_length=64)
+    new_password: Password | None = None
+    new_password_confirm: str | None = Field(None, max_length=128)
     confirm_email: EmailStr
 
 

@@ -25,6 +25,11 @@ PASSWORD_SPECIAL_RE = re.compile(r"[!@#$%^&*()_+\-=[\]{};':\"\\|,.<>/?]")
 
 logger = logging.getLogger(__name__)
 
+# Pre-computed dummy hash used to keep authenticate_user constant-time even
+# when the requested username does not exist, preventing timing-based
+# username enumeration.
+_DUMMY_HASH: str = hash_password("__dummy_for_constant_time_check__")
+
 
 def _ensure_utc(dt: datetime | None) -> datetime | None:
     if dt is None:
@@ -124,7 +129,13 @@ async def authenticate_user(session: AsyncSession, username: str, password: str)
     stmt = select(User).where(User.username == username).options(selectinload(User.role))
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
-    if user and verify_password(password, user.hashed_password):
+    # Always call verify_password regardless of whether the user exists so that
+    # both branches take the same amount of time, preventing username enumeration
+    # via timing side-channel.
+    if user is None:
+        verify_password(password, _DUMMY_HASH)
+        return None
+    if verify_password(password, user.hashed_password):
         return user
     return None
 

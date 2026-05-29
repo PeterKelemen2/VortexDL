@@ -11,6 +11,8 @@ class Settings:
     JWT_SECRET = os.getenv("JWT_SECRET")
     if not JWT_SECRET:
         raise RuntimeError("JWT_SECRET must be set in environment")
+    if len(JWT_SECRET) < 32:
+        raise RuntimeError("JWT_SECRET must be at least 32 characters long (use a cryptographically random value)")
     JWT_ISSUER = os.getenv("JWT_ISSUER", "ytdlp_client")
     JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "ytdlp_client")
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")

@@ -1,3 +1,4 @@
+import io
 import uuid
 from pathlib import Path
 from fastapi import HTTPException, UploadFile
@@ -14,6 +15,11 @@ ALLOWED_IMAGE_TYPES = {
     'image/png': 'png',
     'image/webp': 'webp',
 }
+
+# Reject images that are excessively large in pixel dimensions to prevent
+# decompression bombs and excessive memory/CPU usage during variant generation.
+_MAX_IMAGE_PIXELS = 4000 * 4000  # 16 MP
+_MAX_IMAGE_DIMENSION = 8000      # px on any single side
 
 
 def _ensure_upload_dir() -> Path:
@@ -163,6 +169,29 @@ async def create_user_profile_image(current_user: User, upload_file: UploadFile,
     if len(file_bytes) > max_size:
         raise HTTPException(status_code=400, detail=f"Image must be {settings.PROFILE_IMAGE_MAX_SIZE_MB} MB or smaller.")
 
+    # Validate that the uploaded bytes are actually a valid image, independent
+    # of the caller-supplied Content-Type header which can be spoofed.
+    try:
+        with Image.open(io.BytesIO(file_bytes)) as img:
+            img.verify()
+    except Exception:
+        raise HTTPException(status_code=400, detail="File is not a valid image.")
+
+    # Re-open after verify() (verify() exhausts the file handle) to check dimensions.
+    try:
+        with Image.open(io.BytesIO(file_bytes)) as img:
+            width, height = img.size
+    except Exception:
+        raise HTTPException(status_code=400, detail="File is not a valid image.")
+
+    if width > _MAX_IMAGE_DIMENSION or height > _MAX_IMAGE_DIMENSION:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Image dimensions too large. Maximum is {_MAX_IMAGE_DIMENSION}×{_MAX_IMAGE_DIMENSION} pixels.",
+        )
+    if width * height > _MAX_IMAGE_PIXELS:
+        raise HTTPException(status_code=400, detail="Image resolution too large.")
+
     extension = ALLOWED_IMAGE_TYPES[upload_file.content_type]
     filename = f"{uuid.uuid4().hex}.{extension}"
     root_dir = _ensure_upload_dir()
@@ -186,13 +215,16 @@ async def create_user_profile_image(current_user: User, upload_file: UploadFile,
     thumbnail_relative_path = _get_variant_subpath(relative_path, 'thumbnail')
     preview_relative_path = _get_variant_subpath(relative_path, 'preview')
 
+    # Cap original_filename to the DB column size and strip any path components.
+    safe_original_filename = Path(upload_file.filename).name[:255] if upload_file.filename else filename
+
     image_record = UserImage(
         user_id=current_user.id,
         file_path=relative_path,
         avatar_path=avatar_relative_path,
         thumbnail_path=thumbnail_relative_path,
         preview_path=preview_relative_path,
-        original_filename=Path(upload_file.filename).name,
+        original_filename=safe_original_filename,
         mime_type=upload_file.content_type,
         is_active=False,
     )

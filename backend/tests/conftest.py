@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import text
 
 # Ensure the backend config uses test-safe secrets and an isolated database.
-os.environ.setdefault("JWT_SECRET", "test-secret")
+os.environ.setdefault("JWT_SECRET", "test-secret-that-is-at-least-32-chars!!")
 os.environ["INITIAL_ADMIN_USERNAME"] = ""
 os.environ["INITIAL_ADMIN_EMAIL"] = ""
 os.environ["INITIAL_ADMIN_PASSWORD"] = ""

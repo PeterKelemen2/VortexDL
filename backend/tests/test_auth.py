@@ -46,7 +46,7 @@ def assert_unprocessable(response):
     assert isinstance(response.json().get("detail"), list)
 
 
-async def create_admin_user(username="adminuser", email="admin@example.com", password="Admin123!"):
+async def create_admin_user(username="adminuser", email="admin@example.com", password="AdminSecure123!"):
     async def _create():
         async with async_session() as session:
             role_stmt = select(Role).where(Role.name == "admin")
@@ -219,8 +219,8 @@ async def test_admin_route_unauthenticated_returns_401(client):
 
 
 async def test_admin_users_route_supports_pagination(client):
-    await create_admin_user(username="adminuser", email="admin@example.com", password="Admin123!")
-    login_response = await client.post("/auth/login", json=login_payload(username="adminuser", password="Admin123!"))
+    await create_admin_user(username="adminuser", email="admin@example.com", password="AdminSecure123!")
+    login_response = await client.post("/auth/login", json=login_payload(username="adminuser", password="AdminSecure123!"))
     assert login_response.status_code == 200
 
     async with async_session() as session:
@@ -387,11 +387,20 @@ async def test_tampered_access_token_with_wrong_sid_is_rejected(client):
 
 
 async def test_registration_rejects_weak_password(client):
+    # "weakpass" is below the 12-character minimum; Pydantic rejects it with 422
+    # before the request even reaches service-layer password strength validation.
     payload = register_payload(password="weakpass", email="weak@example.com")
     payload["password_confirm"] = payload["password"]
     response = await client.post("/auth/register", json=payload)
-    assert response.status_code == 400
-    assert "Password must contain" in response.json().get("detail", "")
+    assert response.status_code in (400, 422)
+
+    # A password that is long enough but still weak (no uppercase / digit / special)
+    # should reach the service layer and be rejected with a descriptive 400.
+    payload2 = register_payload(password="thispasswordhasnodigitorspecial", email="weak2@example.com")
+    payload2["password_confirm"] = payload2["password"]
+    response2 = await client.post("/auth/register", json=payload2)
+    assert response2.status_code == 400
+    assert "Password must contain" in response2.json().get("detail", "")
 
 
 async def test_registration_email_uniqueness_is_case_insensitive(client):
@@ -416,7 +425,7 @@ async def test_admin_route_restricts_non_admin_users(client):
 
 async def test_admin_route_allows_admin_users(client):
     await create_admin_user()
-    login_response = await client.post("/auth/login", json=login_payload(username="adminuser", password="Admin123!"))
+    login_response = await client.post("/auth/login", json=login_payload(username="adminuser", password="AdminSecure123!"))
     access_token = login_response.json()["access_token"]
 
     response = await client.get(
@@ -449,7 +458,7 @@ async def test_register_duplicate_username_and_email(client):
 
 
 async def test_login_invalid_credentials(client):
-    response = await client.post("/auth/login", json=login_payload(username="missing", password="badpass"))
+    response = await client.post("/auth/login", json=login_payload(username="missing", password="BadPass123456!"))
     assert response.status_code == 401
     assert response.json().get("detail") == "Invalid credentials"
 
