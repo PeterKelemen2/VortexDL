@@ -239,10 +239,10 @@ watch(
       </div>
     </div>
 
-    <div class="space-y-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="space-y-3 rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
       <div class="flex items-center justify-between gap-4">
-        <p class="text-sm font-medium text-slate-900">Zoom</p>
-        <span class="text-sm text-slate-500">{{ zoom.toFixed(1) }}×</span>
+        <p class="text-sm font-medium text-slate-900 dark:text-slate-100">Zoom</p>
+        <span class="text-sm text-slate-500 dark:text-slate-400">{{ zoom.toFixed(1) }}×</span>
       </div>
       <input
         type="range"
@@ -258,7 +258,7 @@ watch(
     <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
       <button
         type="button"
-        class="inline-flex justify-center rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-200"
+        class="inline-flex justify-center rounded-2xl bg-slate-100 dark:bg-slate-700 px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-200 transition hover:bg-slate-200 dark:hover:bg-slate-600"
         @click="cancel"
       >
         Cancel

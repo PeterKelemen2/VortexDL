@@ -432,9 +432,11 @@ async function updatePassword() {
 
 <template>
   <section class="space-y-6">
-    <section class="rounded-3xl border border-gray-200 bg-white p-4 lg:p-6 shadow-sm">
-      <h2 class="text-xl font-semibold text-slate-900 mb-3">Profile photo</h2>
-      <p class="text-sm text-slate-600 mb-5">
+    <section
+      class="rounded-3xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 lg:p-6 shadow-sm"
+    >
+      <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">Profile photo</h2>
+      <p class="text-sm text-slate-600 dark:text-slate-400 mb-5">
         Upload a profile image and crop it to choose what appears in the avatar button.
       </p>
       <div class="grid gap-5 sm:grid-cols-[auto_1fr] sm:items-center">
@@ -484,18 +486,18 @@ async function updatePassword() {
             </label>
             <span
               v-if="uploadInProgress"
-              class="inline-flex items-center rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-700"
+              class="inline-flex items-center rounded-2xl bg-slate-100 dark:bg-slate-800 px-4 py-3 text-sm text-slate-700 dark:text-slate-300"
             >
               Uploading…
             </span>
           </div>
-          <p class="text-sm text-slate-600">
+          <p class="text-sm text-slate-600 dark:text-slate-400">
             We store the image on the backend and then crop the selected square area for your
             avatar.
           </p>
           <p
             v-if="uploadError"
-            class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            class="rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300"
           >
             {{ uploadError }}
           </p>
@@ -503,14 +505,20 @@ async function updatePassword() {
       </div>
 
       <div v-if="recentProfileImages.length > 1" class="mt-6">
-        <h3 class="text-sm font-semibold text-slate-900 mb-3">Recent profile photos</h3>
+        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
+          Recent profile photos
+        </h3>
         <div class="flex gap-3 pb-1">
           <button
             v-for="image in recentProfileImages.slice(0, 5)"
             :key="image.id"
             type="button"
-            class="shrink-0 rounded-full border p-1 transition hover:border-slate-400"
-            :class="image.is_active ? 'border-primary ring-2 ring-primary/20' : 'border-slate-200'"
+            class="shrink-0 rounded-full border p-1 transition hover:border-slate-400 dark:hover:border-slate-500"
+            :class="
+              image.is_active
+                ? 'border-primary ring-2 ring-primary/20'
+                : 'border-slate-200 dark:border-slate-600'
+            "
             @click="selectImageToActivate(image)"
           >
             <div class="relative h-16 w-16 overflow-hidden rounded-full bg-slate-100">
@@ -534,9 +542,11 @@ async function updatePassword() {
       </div>
     </section>
 
-    <section class="rounded-3xl border border-gray-200 bg-white p-4 lg:p-6 shadow-sm">
-      <h2 class="text-xl font-semibold text-slate-900 mb-3">Change username</h2>
-      <p class="text-sm text-slate-600 mb-5">
+    <section
+      class="rounded-3xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 lg:p-6 shadow-sm"
+    >
+      <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">Change username</h2>
+      <p class="text-sm text-slate-600 dark:text-slate-400 mb-5">
         Update your account name and confirm changes with your current password.
       </p>
       <div class="space-y-4">
@@ -554,7 +564,7 @@ async function updatePassword() {
         />
 
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p class="text-sm text-slate-600">
+          <p class="text-sm text-slate-600 dark:text-slate-400">
             Your current username is <strong>{{ auth.user?.username }}</strong
             >.
           </p>
@@ -569,22 +579,24 @@ async function updatePassword() {
         </div>
         <div
           v-if="profileError"
-          class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          class="rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300"
         >
           {{ profileError }}
         </div>
         <div
           v-if="profileSuccess"
-          class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+          class="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300"
         >
           {{ profileSuccess }}
         </div>
       </div>
     </section>
 
-    <section class="rounded-3xl border border-gray-200 bg-white p-4 lg:p-6 shadow-sm">
-      <h2 class="text-xl font-semibold text-slate-900 mb-3">Change password</h2>
-      <p class="text-sm text-slate-600 mb-5">
+    <section
+      class="rounded-3xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 lg:p-6 shadow-sm"
+    >
+      <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">Change password</h2>
+      <p class="text-sm text-slate-600 dark:text-slate-400 mb-5">
         Use a strong, unique password for your account. Password changes require your current
         password.
       </p>
@@ -604,7 +616,7 @@ async function updatePassword() {
           @blur="passwordFocused = false"
         />
         <div
-          class="overflow-hidden transition-all duration-300 ease-out bg-slate-100 rounded-lg mt-2"
+          class="overflow-hidden transition-all duration-300 ease-out bg-slate-100 dark:bg-slate-800 rounded-lg mt-2"
           :class="passwordFocused ? 'max-h-120' : 'max-h-0'"
         >
           <PasswordStrengthMeter
@@ -626,7 +638,9 @@ async function updatePassword() {
         </div>
 
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p class="text-sm text-slate-600">Password strength must meet the backend policy.</p>
+          <p class="text-sm text-slate-600 dark:text-slate-400">
+            Password strength must meet the backend policy.
+          </p>
           <button
             type="button"
             class="inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
@@ -638,13 +652,13 @@ async function updatePassword() {
         </div>
         <div
           v-if="passwordError"
-          class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          class="rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300"
         >
           {{ passwordError }}
         </div>
         <div
           v-if="passwordSuccess"
-          class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+          class="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300"
         >
           {{ passwordSuccess }}
         </div>
@@ -683,7 +697,7 @@ async function updatePassword() {
           Review the selected previous image before restoring it as your current profile photo.
         </p>
         <div
-          class="mx-auto h-72 w-72 overflow-hidden rounded-full border border-slate-200 bg-slate-100"
+          class="mx-auto h-72 w-72 overflow-hidden rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
         >
           <div
             v-if="selectedImagePreviewStyle"
@@ -698,20 +712,23 @@ async function updatePassword() {
             alt="Selected profile image"
             class="h-full w-full object-cover"
           />
-          <div v-else class="flex h-full w-full items-center justify-center text-slate-500">
+          <div
+            v-else
+            class="flex h-full w-full items-center justify-center text-slate-500 dark:text-slate-400"
+          >
             No image selected.
           </div>
         </div>
         <p
           v-if="activationError"
-          class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          class="rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300"
         >
           {{ activationError }}
         </p>
         <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
-            class="inline-flex justify-center rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-200"
+            class="inline-flex justify-center rounded-2xl bg-slate-100 dark:bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-200 transition hover:bg-slate-200 dark:hover:bg-slate-700"
             @click="cancelActivate"
           >
             Cancel
@@ -735,13 +752,13 @@ async function updatePassword() {
       @close="cancelNavigation"
     >
       <div class="space-y-4">
-        <p class="text-sm text-slate-700">
+        <p class="text-sm text-slate-700 dark:text-slate-300">
           You have unsaved changes. Are you sure you want to leave and discard them?
         </p>
         <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
-            class="btn bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
+            class="btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700"
             @click="cancelNavigation"
           >
             Stay

@@ -20,7 +20,7 @@ const showShell = computed(() => auth.isAuthenticated && !route.meta.guestOnly)
 <template>
   <!-- Block all rendering until auth has been determined (prevents flicker to login on F5) -->
   <template v-if="!auth.initialized">
-    <div class="min-h-screen flex items-center justify-center dark:bg-slate-950 bg-slate-100">
+    <div class="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950">
       <div class="w-8 h-8 rounded-full border-4 border-slate-300 border-t-blue-500 animate-spin" />
     </div>
   </template>
@@ -28,7 +28,7 @@ const showShell = computed(() => auth.isAuthenticated && !route.meta.guestOnly)
     <TopBar :hidden="sidebarOpen" @open-sidebar="sidebarOpen = true" />
     <SideBar :is-open="sidebarOpen" @close="sidebarOpen = false" />
     <!-- Page content — padded to clear the mobile top bar -->
-    <main class="min-h-screen pt-14 dark:bg-slate-950">
+    <main class="min-h-screen pt-14 bg-slate-100 dark:bg-slate-950">
       <router-view />
     </main>
   </template>

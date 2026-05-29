@@ -50,7 +50,7 @@ function togglePassword() {
 
 <template>
   <div>
-    <label :for="inputId" class="block text-gray-700 mb-1 font-medium">{{ label }}</label>
+    <label :for="inputId" class="block text-gray-700 dark:text-slate-300 mb-1 font-medium">{{ label }}</label>
     <div class="relative">
       <input
         :id="inputId"

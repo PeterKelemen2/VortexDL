@@ -81,20 +81,20 @@ onBeforeUnmount(() => {
     >
       <div
         v-if="isVisible"
-        class="relative w-full max-w-2xl overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl shadow-black/10 ring-1 ring-slate-200 sm:p-8"
+        class="relative w-full max-w-2xl overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl shadow-black/10 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-8"
         @click.stop
       >
         <button
           type="button"
-          class="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300"
+          class="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600"
           @click="close"
           aria-label="Close modal"
         >
           <X class="h-4 w-4" />
         </button>
 
-        <div v-if="title" class="mb-5 border-b border-slate-200 pb-4">
-          <h2 class="text-xl font-semibold text-slate-900">{{ title }}</h2>
+        <div v-if="title" class="mb-5 border-b border-slate-200 dark:border-slate-700 pb-4">
+          <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100">{{ title }}</h2>
         </div>
 
         <div class="space-y-4">

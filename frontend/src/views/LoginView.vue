@@ -60,17 +60,12 @@ async function onLogin() {
 
 <template>
   <div
-    class="flex min-h-screen items-center justify-center bg-linear-to-br from-blue-100 to-blue-300"
+    class="flex min-h-screen items-center justify-center bg-linear-to-br from-blue-100 to-blue-300 dark:bg-none dark:bg-[#0a0e17]"
   >
-    <div class="card bg-primary-light">
+    <div class="card">
       <h2>Login</h2>
       <form @submit.prevent="onLogin" class="space-y-5">
-        <TextInput
-          v-model="form.username"
-          label="Username"
-          autocomplete="username"
-          required
-        />
+        <TextInput v-model="form.username" label="Username" autocomplete="username" required />
         <PasswordInput
           v-model="form.password"
           label="Password"

@@ -89,9 +89,9 @@ async function onRegister() {
 
 <template>
   <div
-    class="flex min-h-screen items-center justify-center bg-linear-to-br from-blue-100 to-blue-300"
+    class="flex min-h-screen items-center justify-center bg-linear-to-br from-blue-100 to-blue-300 dark:bg-none dark:bg-[#0a0e17]"
   >
-    <div class="card bg-primary-light">
+    <div class="card">
       <h2>Register</h2>
       <form @submit.prevent="onRegister" class="space-y-5">
         <TextInput v-model="form.username" label="Username" autocomplete="username" required />
@@ -107,7 +107,7 @@ async function onRegister() {
           />
 
           <div
-            class="overflow-hidden transition-all duration-300 ease-out bg-slate-100 rounded-lg mt-2"
+            class="overflow-hidden transition-all duration-300 ease-out bg-slate-100 dark:bg-slate-800 rounded-lg mt-2"
             :class="passwordFocused ? 'max-h-[30rem]' : 'max-h-0'"
           >
             <PasswordStrengthMeter
@@ -126,7 +126,10 @@ async function onRegister() {
             @focus="confirmFocused = true"
             @blur="confirmTouched = true"
           />
-          <div v-if="showConfirmMismatch" class="text-sm font-semibold text-red-600 mt-2">
+          <div
+            v-if="showConfirmMismatch"
+            class="text-sm font-semibold text-red-600 dark:text-red-400 mt-2"
+          >
             Passwords do not match.
           </div>
         </div>
@@ -134,10 +137,14 @@ async function onRegister() {
         <button type="submit" :disabled="!canSubmit" class="btn w-full">
           {{ loading ? 'Registering...' : 'Register' }}
         </button>
-        <div v-if="success" class="text-green-600 text-center font-medium">{{ success }}</div>
-        <div v-if="error" class="text-red-600 text-center font-medium">{{ error }}</div>
+        <div v-if="success" class="text-green-600 dark:text-green-400 text-center font-medium">
+          {{ success }}
+        </div>
+        <div v-if="error" class="text-red-600 dark:text-red-400 text-center font-medium">
+          {{ error }}
+        </div>
         <div class="text-center mt-2">
-          <router-link to="/login" class="text-blue-600 hover:underline"
+          <router-link to="/login" class="text-blue-600 dark:text-blue-400 hover:underline"
             >Already have an account? Login</router-link
           >
         </div>

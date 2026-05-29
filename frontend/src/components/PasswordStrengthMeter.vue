@@ -49,7 +49,7 @@ const barColor = computed(() => {
 <template>
   <div class="space-y-2">
     <div>
-      <p class="text-sm font-medium text-slate-900">{{ label }}</p>
+      <p class="text-sm font-medium text-slate-900 dark:text-slate-100">{{ label }}</p>
       <span
         class="inline-flex rounded-full text-xs font-semibold"
         :class="isPasswordValid ? ' text-emerald-700 ' : ' text-amber-600 '"
@@ -58,16 +58,16 @@ const barColor = computed(() => {
       </span>
     </div>
 
-    <div class="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+    <div class="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
       <div
         class="h-full rounded-full transition-all"
         :style="{ width: barWidth, backgroundColor: barColor }"
       />
     </div>
 
-    <p v-if="helpText" class="text-xs text-slate-500">{{ helpText }}</p>
+    <p v-if="helpText" class="text-xs text-slate-500 dark:text-slate-400">{{ helpText }}</p>
 
-    <ul v-if="showCriteria" class="grid gap-2 text-xs text-slate-600">
+    <ul v-if="showCriteria" class="grid gap-2 text-xs text-slate-600 dark:text-slate-400">
       <li v-for="(rule, index) in strengthCriteria" :key="index" class="flex items-center gap-2">
         <div>
           <Check v-if="rule.valid" class="w-4 h-4 text-emerald-700"></Check>
