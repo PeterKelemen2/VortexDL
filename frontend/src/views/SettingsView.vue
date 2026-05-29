@@ -58,12 +58,12 @@ function selectMenuItem(item) {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto min-h-[calc(100vh-57px)] overflow-hidden">
+  <div class="max-w-7xl mx-auto min-h-[calc(100vh-3.5rem)] overflow-hidden">
     <div class="grid gap-6 lg:grid-cols-[240px_1fr] min-h-full">
       <aside
-        class="overflow-hidden border-b border-gray-200 bg-white pt-4 lg:border-b-0 lg:border-x lg:sticky lg:top-0 lg:self-start lg:min-h-[calc(100vh-57px)]"
+        class="overflow-hidden border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 pt-4 lg:border-b-0 lg:border-x lg:sticky lg:top-0 lg:self-start lg:min-h-[calc(100vh-3.5rem)]"
       >
-        <div class="mb-6 border-b border-gray-200 pb-2">
+        <div class="mb-6 border-b border-gray-200 dark:border-slate-700 pb-2">
           <h3>Settings</h3>
         </div>
 
@@ -75,9 +75,10 @@ function selectMenuItem(item) {
             @click="selectMenuItem(item)"
             :class="[
               'w-full rounded-md px-3 py-2 text-left text-sm font-medium transition',
-              'border border-transparent hover:border-blue-200 hover:bg-blue-100 hover:text-blue-700',
-              { 'bg-blue-50 text-blue-700 border-blue-200': selectedTab === item.id },
-              { 'text-slate-700': selectedTab !== item.id },
+              'border border-transparent hover:border-blue-200 hover:bg-blue-100 hover:text-blue-700 dark:hover:border-blue-800 dark:hover:bg-blue-900/30 dark:hover:text-blue-300',
+              selectedTab === item.id
+                ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800'
+                : 'text-slate-700 dark:text-slate-400',
             ]"
           >
             <component :is="item.icon" class="inline-block w-4 h-4 mr-2" v-if="item.icon" />

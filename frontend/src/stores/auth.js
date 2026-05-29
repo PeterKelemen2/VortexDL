@@ -37,8 +37,12 @@ export const useAuthStore = defineStore('auth', () => {
       const tokens = await api.refresh()
       setAccessToken(tokens.access_token)
       user.value = await api.getCurrentUser(tokens.access_token, setAccessToken)
-    } catch {
-      _clearAuth()
+    } catch (err) {
+      // Only clear auth on explicit auth failures (invalid/expired token or CSRF mismatch).
+      // Network errors and 5xx responses leave the session intact so a retry is possible.
+      if (err?.status === 401 || err?.status === 403) {
+        _clearAuth()
+      }
     } finally {
       initialized.value = true
     }

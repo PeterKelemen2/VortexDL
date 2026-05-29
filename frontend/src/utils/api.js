@@ -37,17 +37,14 @@ function hasSessionCookies() {
 async function request(path, { method = 'GET', body, headers = {}, token } = {}) {
   const opts = {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers,
-    },
+    headers: { ...headers },
     credentials: 'include',
   }
 
   if (body instanceof FormData) {
-    delete opts.headers['Content-Type']
     opts.body = body
   } else if (body) {
+    opts.headers['Content-Type'] = 'application/json'
     opts.body = JSON.stringify(body)
   }
 
