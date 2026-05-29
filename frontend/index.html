@@ -29,6 +29,11 @@
         animation: spin 0.75s linear infinite;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
+      #loading-overlay.fade-out {
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+      }
     </style>
     <div id="loading-overlay"><div class="spinner"></div></div>
     <div id="app"></div>

@@ -19,6 +19,9 @@ router.isReady().then(() => {
   // that includes any in-flight navigation redirect chains and Vue re-renders.
   // This means the overlay stays visible until the *final* route is painted.
   requestAnimationFrame(() => {
-    document.getElementById('loading-overlay')?.remove()
+    const overlay = document.getElementById('loading-overlay')
+    if (!overlay) return
+    overlay.addEventListener('transitionend', () => overlay.remove(), { once: true })
+    overlay.classList.add('fade-out')
   })
 })
