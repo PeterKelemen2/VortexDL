@@ -26,16 +26,27 @@ const router = createRouter({
   routes,
 })
 
+// Only allow redirects to internal paths (no protocol-relative or external URLs).
+function resolveRedirect(redirectParam) {
+  if (typeof redirectParam === 'string' && redirectParam.startsWith('/') && !redirectParam.startsWith('//')) {
+    return { path: redirectParam }
+  }
+  return { name: 'home' }
+}
+
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
   await auth.init()
 
   if (to.meta.guestOnly && auth.isAuthenticated) {
-    return { name: 'home' }
+    // Honour the ?redirect= param so that a user who was bounced to login
+    // (e.g. mid-refresh on F5) ends up back at the page they came from
+    // instead of always landing on home.
+    return to.query.redirect ? resolveRedirect(to.query.redirect) : { name: 'home' }
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return { name: 'login' }
+    return { name: 'login', query: to.fullPath !== '/' ? { redirect: to.fullPath } : undefined }
   }
 
   if (to.meta.requiresAdmin && !auth.isAdmin) {

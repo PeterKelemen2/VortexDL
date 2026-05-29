@@ -37,13 +37,19 @@ export const useAuthStore = defineStore('auth', () => {
       const tokens = await api.refresh()
       setAccessToken(tokens.access_token)
       user.value = await api.getCurrentUser(tokens.access_token, setAccessToken)
+      initialized.value = true
     } catch (err) {
-      // Only clear auth on explicit auth failures (invalid/expired token or CSRF mismatch).
-      // Network errors and 5xx responses leave the session intact so a retry is possible.
+      // Explicit auth rejection: the session is gone, mark as definitively logged out.
       if (err?.status === 401 || err?.status === 403) {
         _clearAuth()
+        initialized.value = true
+        return
       }
-    } finally {
+      // Transient failure (network error, 5xx, AbortError from rapid F5): we cannot
+      // determine auth status. Reset initPromise so the NEXT navigation retries instead
+      // of caching the failure. Still mark initialized so the current guard can proceed
+      // (it will see user=null → redirect to login with ?redirect= preserved).
+      initPromise = null
       initialized.value = true
     }
   }

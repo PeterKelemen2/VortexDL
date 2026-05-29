@@ -147,13 +147,15 @@ async def refresh(
         db,
         user_agent=request.headers.get("user-agent"),
     )
-    csrf_token = secrets.token_urlsafe(32)
-    # Only overwrite the refresh-token cookie when the token was actually rotated.
-    # Leaving it unchanged on rapid refreshes prevents Set-Cookie races that could
-    # leave the browser holding a just-revoked token.
+    # Only overwrite the cookies when the refresh token was actually rotated
+    # (near-expiry case). Rotating the CSRF cookie on every access-token refresh
+    # creates a race window: the browser may send a stale X-CSRF-Token header
+    # (read via document.cookie) while the cookie jar already has the new value
+    # from a concurrent response, causing a spurious 403 on rapid F5 presses.
     if token_response.refresh_token:
+        csrf_token = secrets.token_urlsafe(32)
         _set_refresh_cookie(response, request, token_response.refresh_token)
-    _set_csrf_cookie(response, request, csrf_token)
+        _set_csrf_cookie(response, request, csrf_token)
     return TokenResponse(access_token=token_response.access_token)
 
 

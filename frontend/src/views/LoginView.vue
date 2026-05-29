@@ -1,11 +1,12 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import PasswordInput from '@/components/PasswordInput.vue'
 import TextInput from '@/components/TextInput.vue'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const form = ref({ username: '', password: '' })
 const loading = ref(false)
@@ -48,7 +49,7 @@ async function onLogin() {
     )
     success.value = 'Login successful! Redirecting...'
     await new Promise((resolve) => setTimeout(resolve, 1000))
-    await router.push('/')
+    await router.push(route.query.redirect || '/')
   } catch (e) {
     error.value = e.message
   } finally {
