@@ -11,6 +11,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => user.value?.role === 'admin')
 
   let initPromise = null
+  let _transientFailCount = 0
 
   async function init() {
     if (initialized.value) return
@@ -23,6 +24,7 @@ export const useAuthStore = defineStore('auth', () => {
       try {
         user.value = await api.getCurrentUser(accessToken.value, setAccessToken)
         initialized.value = true
+        _transientFailCount = 0
         return
       } catch {
         // access token might be expired or invalid
@@ -32,25 +34,35 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       if (!hasSessionCookies()) {
         initialized.value = true
+        _transientFailCount = 0
         return
       }
       const tokens = await api.refresh()
       setAccessToken(tokens.access_token)
       user.value = await api.getCurrentUser(tokens.access_token, setAccessToken)
       initialized.value = true
+      _transientFailCount = 0
     } catch (err) {
-      // Explicit auth rejection: the session is gone, mark as definitively logged out.
+      // Explicit auth rejection: session is gone, definitively logged out.
       if (err?.status === 401 || err?.status === 403) {
         _clearAuth()
         initialized.value = true
+        _transientFailCount = 0
         return
       }
-      // Transient failure (network error, 5xx, AbortError from rapid F5): we cannot
-      // determine auth status. Reset initPromise so the NEXT navigation retries instead
-      // of caching the failure. Still mark initialized so the current guard can proceed
-      // (it will see user=null → redirect to login with ?redirect= preserved).
+      // Transient failure (network error, AbortError from a rapid F5 reload, 5xx).
+      // Do NOT mark initialized — App.vue will keep showing the spinner instead of
+      // flashing the login page. Reset initPromise so the next navigation guard
+      // triggers a fresh retry automatically (the /login route's beforeEach will
+      // call auth.init() again).
+      // After 3 consecutive transient failures we give up to avoid an infinite loop
+      // (e.g. backend is genuinely down), and fall through to showing the login page.
+      _transientFailCount++
       initPromise = null
-      initialized.value = true
+      if (_transientFailCount >= 3) {
+        _transientFailCount = 0
+        initialized.value = true
+      }
     }
   }
 
@@ -85,6 +97,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     initPromise = null
     initialized.value = false
+    _transientFailCount = 0
   }
 
   return {
