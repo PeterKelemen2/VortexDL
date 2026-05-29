@@ -20,6 +20,7 @@ const menuItems = computed(() => {
       route: 'settings',
       query: { tab: 'account' },
       component: AccountSettings,
+      description: 'Manage your profile, username, and password.',
     },
     {
       id: 'security',
@@ -28,6 +29,7 @@ const menuItems = computed(() => {
       route: 'settings',
       query: { tab: 'security' },
       component: SecuritySettings,
+      description: 'Review and revoke your active login sessions.',
     },
   ]
 
@@ -39,6 +41,7 @@ const menuItems = computed(() => {
       route: 'settings',
       query: { tab: 'users' },
       component: UsersSettings,
+      description: 'Administer user accounts and roles.',
     })
   }
 
@@ -58,44 +61,84 @@ function selectMenuItem(item) {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto min-h-[calc(100vh-3.5rem)] overflow-hidden">
-    <div class="grid gap-6 lg:grid-cols-[240px_1fr] min-h-full">
-      <aside
-        class="overflow-hidden border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 pt-4 lg:border-b-0 lg:border-x lg:sticky lg:top-0 lg:self-start lg:min-h-[calc(100vh-3.5rem)]"
-      >
-        <div class="mb-6 border-b border-gray-200 dark:border-slate-700 pb-2">
-          <h3>Settings</h3>
-        </div>
+  <div class="flex min-h-[calc(100vh-3.5rem)]">
+    <!-- Left sidebar — desktop only -->
+    <aside
+      class="hidden lg:flex flex-col w-52 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+    >
+      <div class="px-4 pt-6 pb-1">
+        <p
+          class="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-600 px-2"
+        >
+          Settings
+        </p>
+      </div>
+      <nav class="px-3 py-2 space-y-0.5">
+        <button
+          v-for="item in menuItems"
+          :key="item.id"
+          type="button"
+          @click="selectMenuItem(item)"
+          :class="[
+            'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+            selectedTab === item.id
+              ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100',
+          ]"
+        >
+          <component
+            :is="item.icon"
+            :class="[
+              'w-4 h-4 shrink-0',
+              selectedTab === item.id
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-slate-400 dark:text-slate-500',
+            ]"
+          />
+          {{ item.label }}
+        </button>
+      </nav>
+    </aside>
 
-        <nav class="space-y-2 px-2">
+    <!-- Main content column -->
+    <div class="flex-1 min-w-0 flex flex-col">
+      <!-- Mobile horizontal tab bar -->
+      <div
+        class="lg:hidden sticky top-14 z-10 flex border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+      >
+        <nav class="flex gap-1 px-4 py-2 overflow-x-auto">
           <button
             v-for="item in menuItems"
             :key="item.id"
             type="button"
             @click="selectMenuItem(item)"
             :class="[
-              'w-full rounded-md px-3 py-2 text-left text-sm font-medium transition',
-              'border border-transparent hover:border-blue-200 hover:bg-blue-100 hover:text-blue-700 dark:hover:border-blue-800 dark:hover:bg-blue-900/30 dark:hover:text-blue-300',
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all shrink-0',
               selectedTab === item.id
-                ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800'
-                : 'text-slate-700 dark:text-slate-400',
+                ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800',
             ]"
           >
-            <component :is="item.icon" class="inline-block w-4 h-4 mr-2" v-if="item.icon" />
+            <component :is="item.icon" class="w-4 h-4 shrink-0" />
             {{ item.label }}
           </button>
         </nav>
-      </aside>
+      </div>
 
-      <main class="flex min-h-full flex-col overflow-hidden rounded-3xl">
-        <!-- <div class="border-b border-gray-200 bg-white px-6 py-5">
-          <h2>{{ selectedItem.label }} settings</h2>
-        </div> -->
-
-        <section class="flex-1 min-h-0 overflow-auto py-6 px-4">
+      <!-- Page content -->
+      <div class="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
+        <div class="max-w-3xl mx-auto px-4 py-8 lg:py-10">
+          <div class="mb-7">
+            <p class="text-xl font-bold text-slate-900 dark:text-slate-100">
+              {{ selectedItem.label }}
+            </p>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              {{ selectedItem.description }}
+            </p>
+          </div>
           <component :is="selectedItem.component" />
-        </section>
-      </main>
+        </div>
+      </div>
     </div>
   </div>
 </template>

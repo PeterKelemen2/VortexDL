@@ -78,97 +78,93 @@ onMounted(loadSessions)
 </script>
 
 <template>
-  <section class="space-y-6">
-    <section
-      class="rounded-3xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 lg:p-6 shadow-sm"
+  <div>
+    <div
+      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden"
     >
-      <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">Active sessions</h2>
-      <p class="text-sm text-slate-600 dark:text-slate-400 mb-5">
-        Manage your active refresh token sessions and revoke any device sessions you no longer use.
-      </p>
-
-      <div v-if="loading" class="text-center py-8 text-slate-600 dark:text-slate-400">
-        Loading sessions…
-      </div>
-      <div v-else-if="error" class="text-center text-red-600 dark:text-red-400 font-medium">
-        {{ error }}
-      </div>
-      <div
-        v-else-if="successMessage"
-        class="text-center text-green-600 dark:text-green-400 font-medium"
-      >
-        {{ successMessage }}
-      </div>
-      <div v-else-if="sessions.length === 0" class="text-center text-gray-600 dark:text-slate-400">
-        No active sessions found.
-      </div>
-
-      <ul v-else class="space-y-4">
-        <li
-          v-for="session in sessions"
-          :key="session.id"
-          class="rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 lg:p-5 shadow-sm"
+      <div class="px-5 py-5 sm:px-8 border-b border-slate-200 dark:border-slate-800">
+        <p
+          class="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
         >
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div class="flex items-center gap-4">
-                <p class="text-lg font-semibold text-gray-900 dark:text-slate-100">
-                  {{ session.resolved_name || 'Unknown host' }}
-                </p>
-                <div class="flex flex-wrap items-center gap-2">
-                  <p class="text-sm text-gray-500 dark:text-slate-400">
-                    {{ session.device_name || 'Unknown device' }}
+          Active sessions
+        </p>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1.5">
+          Manage your active refresh token sessions and revoke any you no longer use.
+        </p>
+      </div>
+      <div class="px-5 py-5 sm:px-8">
+        <div v-if="loading" class="text-center py-8 text-slate-600 dark:text-slate-400">
+          Loading sessions…
+        </div>
+        <div v-else-if="error" class="text-center text-red-600 dark:text-red-400 font-medium">
+          {{ error }}
+        </div>
+        <div
+          v-else-if="successMessage"
+          class="text-center text-green-600 dark:text-green-400 font-medium"
+        >
+          {{ successMessage }}
+        </div>
+        <div
+          v-else-if="sessions.length === 0"
+          class="text-center text-gray-600 dark:text-slate-400"
+        >
+          No active sessions found.
+        </div>
+
+        <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
+          <li v-for="session in sessions" :key="session.id" class="py-4 first:pt-1 last:pb-0">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div class="flex items-center gap-4">
+                  <p class="text-lg font-semibold text-gray-900 dark:text-slate-100">
+                    {{ session.resolved_name || 'Unknown host' }}
                   </p>
-                  <span
-                    v-if="session.current"
-                    class="rounded-full bg-green-100 dark:bg-green-900/40 px-2 py-1 text-xs font-semibold text-green-700 dark:text-green-400"
-                  >
-                    Current session
-                  </span>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <p class="text-sm text-gray-500 dark:text-slate-400">
+                      {{ session.device_name || 'Unknown device' }}
+                    </p>
+                    <span
+                      v-if="session.current"
+                      class="rounded-full bg-green-100 dark:bg-green-900/40 px-2 py-1 text-xs font-semibold text-green-700 dark:text-green-400"
+                    >
+                      Current session
+                    </span>
+                  </div>
                 </div>
               </div>
+              <div class="text-sm text-gray-500 dark:text-slate-400 text-right">
+                <p>Created: {{ new Date(session.created_at).toLocaleString() }}</p>
+                <p>
+                  Last used:
+                  {{
+                    session.last_used_at ? new Date(session.last_used_at).toLocaleString() : 'Never'
+                  }}
+                </p>
+              </div>
             </div>
-            <div class="text-sm text-gray-500 dark:text-slate-400 text-right">
-              <p>Created: {{ new Date(session.created_at).toLocaleString() }}</p>
-              <p>
-                Last used:
-                {{
-                  session.last_used_at ? new Date(session.last_used_at).toLocaleString() : 'Never'
-                }}
+            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm text-gray-600 dark:text-slate-400 wrap-break-word">
+                <span class="font-medium">User Agent:</span>
+                {{ session.user_agent || 'Not available' }}
               </p>
+              <button
+                class="inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="revokingSessionId === session.id"
+                @click="openRevokeModal(session)"
+              >
+                <span v-if="revokingSessionId === session.id">Revoking…</span>
+                <span v-else>
+                  {{ session.current ? 'Revoke current session' : 'Revoke session' }}
+                </span>
+              </button>
             </div>
-          </div>
-          <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p class="text-sm text-gray-600 dark:text-slate-400 wrap-break-word">
-              <span class="font-medium">User Agent:</span>
-              {{ session.user_agent || 'Not available' }}
-            </p>
-            <button
-              class="inline-flex items-center justify-center rounded-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm font-medium text-gray-700 dark:text-slate-200 shadow-sm transition hover:bg-gray-50 dark:hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="revokingSessionId === session.id"
-              @click="openRevokeModal(session)"
-            >
-              <span v-if="revokingSessionId === session.id">Revoking…</span>
-              <span v-else>
-                {{ session.current ? 'Revoke current session' : 'Revoke session' }}
-              </span>
-            </button>
-          </div>
-        </li>
-      </ul>
-    </section>
+          </li>
+        </ul>
+      </div>
+    </div>
 
-    <Modal
-      :model-value="showConfirmModal"
-      title="Revoke session"
-      @update:modelValue="
-        (value) => {
-          showConfirmModal.value = value
-          if (!value) cancelRevoke()
-        }
-      "
-      @close="cancelRevoke"
-    >
+    <Modal v-model="showConfirmModal" title="Revoke session" @close="cancelRevoke">
       <div class="space-y-4">
         <p class="text-sm text-slate-700 dark:text-slate-300">
           Are you sure you want to revoke this session?
@@ -193,7 +189,7 @@ onMounted(loadSessions)
           </button>
           <button
             type="button"
-            class="btn bg-primary text-white hover:bg-primary-dark"
+            class="btn bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 focus:ring-red-300"
             :disabled="revokingSessionId === pendingRevokeSession?.id"
             @click="confirmRevokeSession"
           >
@@ -202,5 +198,5 @@ onMounted(loadSessions)
         </div>
       </div>
     </Modal>
-  </section>
+  </div>
 </template>
