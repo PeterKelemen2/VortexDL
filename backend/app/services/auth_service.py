@@ -198,23 +198,11 @@ async def create_tokens(
     return access_token, raw_refresh
 
 
-async def rotate_refresh_token(
-    session: AsyncSession,
-    user: User,
-    old_token: RefreshToken,
-    device_name: str | None = None,
-    user_agent: str | None = None,
-):
-    old_token.revoked = True
-    await session.commit()
-    return await create_tokens(
-        session,
-        user,
-        device_name=device_name,
-        resolved_name=old_token.resolved_name,
-        device_os=old_token.device_os,
-        user_agent=user_agent,
-    )
+# A refresh token is rotated (silently replaced) only when it is within this
+# many hours of expiring.  For the entire rest of its 14-day lifetime the same
+# token is reused — eliminating all concurrent-refresh race conditions.
+REFRESH_TOKEN_NEAR_EXPIRY_HOURS = 24
+
 
 
 async def ensure_roles_exist(db: AsyncSession) -> dict[str, Role]:
@@ -403,32 +391,57 @@ async def refresh_tokens(
             raise HTTPException(status_code=401, detail="Refresh token required")
 
         token_hash_val = hash_token(data.refresh_token)
+        now = datetime.now(timezone.utc)
+
         stmt = select(RefreshToken).where(
             RefreshToken.token_hash == token_hash_val,
-            RefreshToken.revoked == False
+            RefreshToken.revoked == False,
         )
         result = await db.execute(stmt)
         db_token = result.scalar_one_or_none()
-        if not db_token or _ensure_utc(db_token.expires_at) < datetime.now(timezone.utc):
+
+        if not db_token or _ensure_utc(db_token.expires_at) < now:
             raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
-        # FIX: load user with role eagerly to avoid lazy-load issues
         user_stmt = select(User).where(User.id == db_token.user_id).options(selectinload(User.role))
         user_result = await db.execute(user_stmt)
         user = user_result.scalar_one_or_none()
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
 
-        db_token.last_used_at = datetime.now(timezone.utc)
+        # Rotate the refresh token only when it is within REFRESH_TOKEN_NEAR_EXPIRY_HOURS
+        # of expiring.  For the whole rest of its 14-day lifetime the same token is
+        # reused — concurrent page-load requests (rapid F5, multiple tabs) all succeed
+        # without any race condition because the cookie never changes mid-flight.
+        near_expiry = _ensure_utc(db_token.expires_at) < now + timedelta(hours=REFRESH_TOKEN_NEAR_EXPIRY_HOURS)
+
+        db_token.last_used_at = now
         await db.commit()
-        access_token, new_refresh = await rotate_refresh_token(
-            db,
-            user,
-            db_token,
-            device_name=device_name,
-            user_agent=user_agent,
+
+        if near_expiry:
+            # Revoke the old token and issue a fresh 14-day one.
+            db_token.revoked = True
+            await db.commit()
+            access_token, new_refresh = await create_tokens(
+                db,
+                user,
+                resolved_name=db_token.resolved_name,
+                device_os=db_token.device_os,
+                user_agent=user_agent,
+            )
+            return TokenResponse(access_token=access_token, refresh_token=new_refresh)
+
+        # Not near expiry: issue a new access token, leave the refresh cookie alone.
+        # Return refresh_token=None so the caller knows not to overwrite the cookie.
+        access_token = create_access_token(
+            data={"sub": str(user.id), "role": user.role.name, "sid": db_token.id},
+            secret=settings.JWT_SECRET,
+            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+            issuer=settings.JWT_ISSUER,
+            audience=settings.JWT_AUDIENCE,
+            algorithm=settings.JWT_ALGORITHM,
         )
-        return TokenResponse(access_token=access_token, refresh_token=new_refresh)
+        return TokenResponse(access_token=access_token, refresh_token=None)
     else:
         raise HTTPException(status_code=400, detail="Invalid request")
 

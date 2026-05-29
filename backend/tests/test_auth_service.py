@@ -18,7 +18,6 @@ from app.services.auth_service import (
     _ensure_utc,
     hash_token,
     create_tokens,
-    rotate_refresh_token,
     resolve_hostname,
     detect_device_os,
     detect_device_name,
@@ -167,7 +166,7 @@ async def test_create_tokens_persists_refresh_token_and_normalizes_generic_devic
 
 
 @pytest.mark.asyncio
-async def test_rotate_refresh_token_revokes_old_token_and_creates_new():
+async def test_near_expiry_rotation_revokes_old_token_and_creates_new():
     async with async_session() as session:
         await session.execute(text("DELETE FROM users"))
         await session.execute(text("DELETE FROM roles"))
@@ -198,10 +197,14 @@ async def test_rotate_refresh_token_revokes_old_token_and_creates_new():
         result = await session.execute(stmt)
         old_token = result.scalar_one()
 
-        new_access, new_refresh = await rotate_refresh_token(
+        # Simulate the near-expiry rotation path: revoke old, create new.
+        old_token.revoked = True
+        await session.commit()
+        new_access, new_refresh = await create_tokens(
             session,
             user,
-            old_token,
+            resolved_name=old_token.resolved_name,
+            device_os=old_token.device_os,
             user_agent="Mozilla/5.0 (Linux; Android 15; Pixel 8)",
         )
 

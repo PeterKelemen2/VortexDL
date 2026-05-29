@@ -100,7 +100,6 @@ async def test_register_login_refresh_logout_flow(client):
     )
     assert refresh_response.status_code == 200
     assert "access_token" in refresh_response.json()
-    assert refresh_response.json()["access_token"] != access_token
 
     logout_response = await client.post(
         "/auth/logout",
@@ -116,21 +115,51 @@ async def test_register_login_refresh_logout_flow(client):
     assert refresh_after_logout.status_code in (401, 403)
 
 
-async def test_refresh_rotates_and_revokes_old_refresh_token(client):
+async def test_refresh_reuses_token_within_lifetime(client):
+    """Refreshes during the token's normal lifetime always reuse the same cookie."""
     await client.post("/auth/register", json=register_payload())
     await client.post("/auth/login", json=login_payload())
-    old_refresh_token = client.cookies.get("refresh_token")
-    assert old_refresh_token is not None
+    token_after_login = client.cookies.get("refresh_token")
+    assert token_after_login is not None
 
-    refresh_response = await client.post("/auth/refresh", headers=csrf_header(client))
-    assert refresh_response.status_code == 200
-    new_refresh_token = client.cookies.get("refresh_token")
-    assert new_refresh_token is not None
-    assert new_refresh_token != old_refresh_token
+    # Back-to-back refreshes — cookie must remain unchanged throughout the lifetime.
+    for _ in range(3):
+        r = await client.post("/auth/refresh", headers=csrf_header(client))
+        assert r.status_code == 200
+        assert client.cookies.get("refresh_token") == token_after_login
 
-    client.cookies.set("refresh_token", old_refresh_token, path="/auth")
-    stale_refresh_response = await client.post("/auth/refresh", headers=csrf_header(client))
-    assert stale_refresh_response.status_code == 401
+
+async def test_refresh_rotates_near_expiry_and_old_token_rejected(client):
+    """A token within the near-expiry window is replaced and the old one rejected."""
+    from app.models.refresh_token import RefreshToken as RTModel
+    from app.core.db import async_session
+    import hashlib
+
+    await client.post("/auth/register", json=register_payload())
+    await client.post("/auth/login", json=login_payload())
+    old_token = client.cookies.get("refresh_token")
+    assert old_token is not None
+
+    # Move expires_at into the near-expiry window (< 24 h remaining).
+    old_hash = hashlib.sha256(old_token.encode()).hexdigest()
+    async with async_session() as session:
+        from sqlalchemy import select as sa_select
+        result = await session.execute(sa_select(RTModel).where(RTModel.token_hash == old_hash))
+        db_token = result.scalar_one_or_none()
+        assert db_token is not None
+        db_token.expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        await session.commit()
+
+    r = await client.post("/auth/refresh", headers=csrf_header(client))
+    assert r.status_code == 200
+    new_token = client.cookies.get("refresh_token")
+    assert new_token is not None
+    assert new_token != old_token
+
+    # Old token must now be rejected.
+    client.cookies.set("refresh_token", old_token, path="/auth")
+    stale = await client.post("/auth/refresh", headers=csrf_header(client))
+    assert stale.status_code == 401
 
 
 async def test_refresh_without_refresh_cookie_returns_401(client):

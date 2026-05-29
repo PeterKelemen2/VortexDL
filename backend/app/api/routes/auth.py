@@ -148,7 +148,11 @@ async def refresh(
         user_agent=request.headers.get("user-agent"),
     )
     csrf_token = secrets.token_urlsafe(32)
-    _set_refresh_cookie(response, request, token_response.refresh_token)
+    # Only overwrite the refresh-token cookie when the token was actually rotated.
+    # Leaving it unchanged on rapid refreshes prevents Set-Cookie races that could
+    # leave the browser holding a just-revoked token.
+    if token_response.refresh_token:
+        _set_refresh_cookie(response, request, token_response.refresh_token)
     _set_csrf_cookie(response, request, csrf_token)
     return TokenResponse(access_token=token_response.access_token)
 
