@@ -5,7 +5,8 @@ import { useAuthStore } from '@/stores/auth'
 import AccountSettings from '@/components/AccountSettings.vue'
 import SecuritySettings from '@/components/SecuritySettings.vue'
 import UsersSettings from '@/components/UsersSettings.vue'
-import { ContactRound, Users, Shield } from 'lucide-vue-next'
+import AuditLogSettings from '@/components/AuditLogSettings.vue'
+import { ContactRound, Users, Shield, ScrollText } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
@@ -42,6 +43,16 @@ const menuItems = computed(() => {
       query: { tab: 'users' },
       component: UsersSettings,
       description: 'Administer user accounts and roles.',
+    })
+    items.push({
+      id: 'audit',
+      label: 'Audit log',
+      icon: ScrollText,
+      route: 'settings',
+      query: { tab: 'audit' },
+      component: AuditLogSettings,
+      description: 'Review security-relevant events.',
+      wide: true,
     })
   }
 
@@ -127,7 +138,7 @@ function selectMenuItem(item) {
 
       <!-- Page content -->
       <div class="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
-        <div class="max-w-3xl mx-auto px-4 py-8 lg:py-10">
+        <div :class="['mx-auto px-4 py-8 lg:py-10', selectedItem.wide ? 'max-w-7xl' : 'max-w-3xl']">
           <div class="mb-7">
             <p class="text-xl font-bold text-slate-900 dark:text-slate-100">
               {{ selectedItem.label }}
