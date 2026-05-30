@@ -33,6 +33,14 @@ export default defineConfig(({ mode }) => {
           target: BACKEND_PROXY_TARGET,
           changeOrigin: true,
         },
+        '/api-keys': {
+          target: BACKEND_PROXY_TARGET,
+          changeOrigin: true,
+        },
+        '/jobs': {
+          target: BACKEND_PROXY_TARGET,
+          changeOrigin: true,
+        },
       },
     },
   }
