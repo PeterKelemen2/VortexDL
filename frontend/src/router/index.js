@@ -6,6 +6,9 @@ import SettingsView from '@/views/SettingsView.vue'
 import AdminView from '@/views/AdminView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import ForbiddenView from '@/views/ForbiddenView.vue'
+import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
+import ResetPasswordView from '@/views/ResetPasswordView.vue'
+import VerifyEmailView from '@/views/VerifyEmailView.vue'
 import { useAuthStore } from '@/stores/auth'
 import { setLucideFavicon } from '@/utils/favicon'
 import { BRAND_NAME, BRAND_ICON } from '@/constants/branding'
@@ -18,6 +21,9 @@ const routes = [
   { path: '/forbidden', name: 'forbidden', component: ForbiddenView, meta: { title: 'Forbidden' } },
   { path: '/register', name: 'register', component: RegisterView, meta: { title: 'Register', guestOnly: true } },
   { path: '/login', name: 'login', component: LoginView, meta: { title: 'Login', guestOnly: true } },
+  { path: '/forgot-password', name: 'forgot-password', component: ForgotPasswordView, meta: { title: 'Forgot Password', guestOnly: true } },
+  { path: '/reset-password', name: 'reset-password', component: ResetPasswordView, meta: { title: 'Reset Password', guestOnly: true } },
+  { path: '/verify-email', name: 'verify-email', component: VerifyEmailView, meta: { title: 'Verify Email' } },
   { path: '/:pathMatch(.*)*', redirect: '/not-found' },
 ]
 

@@ -15,6 +15,8 @@ class UserBase(BaseModel):
 class UserLogin(UserBase):
     # No min-length on password at login; the hash check handles wrong passwords.
     password: str = Field(min_length=1, max_length=128)
+    # Optional TOTP code or backup code when the account has 2FA enabled.
+    totp_code: str | None = Field(None, max_length=32)
     device_name: str | None = Field(None, max_length=255)
     user_agent: str | None = Field(None, max_length=512)
 
