@@ -2,6 +2,8 @@
 *.env.*
 .venv
 __pycache__
+*.db
+uploads
 
 # Python cache and test artifacts
 *.pyc
@@ -25,6 +27,7 @@ node_modules
 dist
 dist-ssr
 coverage
+.coverage
 *.local
 
 # Editor directories and files

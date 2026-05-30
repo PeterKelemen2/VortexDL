@@ -1,0 +1,647 @@
+<script setup>
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { api } from '@/utils/api'
+import Modal from '@/components/Modal.vue'
+import TextInput from '@/components/TextInput.vue'
+import PasswordInput from '@/components/PasswordInput.vue'
+
+const auth = useAuthStore()
+const users = ref([])
+const roles = ref([])
+const loadingUsers = ref(false)
+const loadingRoles = ref(false)
+const pageError = ref('')
+const pageSuccess = ref('')
+const currentPage = ref(1)
+const pageSize = ref(5)
+const totalPages = ref(1)
+const totalUsers = ref(0)
+const pageDirection = ref('left')
+const pageKey = ref(0)
+const initialPageLoad = ref(true)
+const pageSizeOptions = [5, 10, 20]
+
+function getSavedPageSize() {
+  if (typeof window === 'undefined') {
+    return 5
+  }
+  const savedValue = Number(window.localStorage.getItem('users-settings-page-size'))
+  return pageSizeOptions.includes(savedValue) ? savedValue : 5
+}
+
+function savePageSize(value) {
+  if (typeof window === 'undefined') {
+    return
+  }
+  window.localStorage.setItem('users-settings-page-size', String(value))
+}
+
+pageSize.value = getSavedPageSize()
+
+const transitionName = computed(() => (initialPageLoad.value ? '' : `slide-${pageDirection.value}`))
+
+const modalOpen = ref(false)
+const currentAction = ref('')
+const currentUser = ref(null)
+const actionError = ref('')
+const actionSuccess = ref('')
+const actionSubmitting = ref(false)
+const confirmEmailInput = ref('')
+
+const actionForm = reactive({
+  username: '',
+  newPassword: '',
+  newPasswordConfirm: '',
+  role: '',
+})
+
+const actionDetails = {
+  editUsername: {
+    title: 'Change username',
+    description: 'Update a user’s username and confirm the target email before saving.',
+  },
+  changePassword: {
+    title: 'Change password',
+    description: 'Set a new password for a user. This action requires email confirmation.',
+  },
+  changeRole: {
+    title: 'Change role',
+    description: 'Assign a new role to a user. This action requires email confirmation.',
+  },
+  deleteUser: {
+    title: 'Delete user',
+    description: 'Permanently delete this user account. Type the user email to confirm.',
+  },
+}
+
+const actionLabel = computed(() => {
+  if (currentAction.value === 'deleteUser') return 'Delete user'
+  return 'Save changes'
+})
+
+const roleOptions = computed(() => {
+  if (roles.value.length) return roles.value
+  return ['user', 'admin']
+})
+
+function resetActionState() {
+  actionError.value = ''
+  actionSuccess.value = ''
+  actionSubmitting.value = false
+  confirmEmailInput.value = ''
+  actionForm.username = ''
+  actionForm.newPassword = ''
+  actionForm.newPasswordConfirm = ''
+  actionForm.role = currentUser.value?.role ?? ''
+}
+
+function openAction(user, actionType) {
+  currentUser.value = user
+  currentAction.value = actionType
+  actionForm.username = user.username
+  actionForm.role = user.role
+  actionForm.newPassword = ''
+  actionForm.newPasswordConfirm = ''
+  confirmEmailInput.value = ''
+  actionError.value = ''
+  actionSuccess.value = ''
+  modalOpen.value = true
+}
+
+function closeModal() {
+  modalOpen.value = false
+  currentAction.value = ''
+  currentUser.value = null
+  resetActionState()
+}
+
+async function loadUsers(page = currentPage.value) {
+  loadingUsers.value = true
+  pageError.value = ''
+  try {
+    const response = await api.listUsers(
+      page,
+      pageSize.value,
+      auth.accessToken,
+      auth.setAccessToken,
+    )
+    users.value = response.items
+    currentPage.value = response.page
+    totalPages.value = response.total_pages
+    totalUsers.value = response.total
+    if (!initialPageLoad.value) {
+      pageKey.value += 1
+    }
+    if (currentPage.value > totalPages.value && totalPages.value > 0) {
+      currentPage.value = totalPages.value
+      await loadUsers(currentPage.value)
+      return
+    }
+    initialPageLoad.value = false
+  } catch (error) {
+    pageError.value = error.message || 'Unable to load users.'
+  } finally {
+    loadingUsers.value = false
+  }
+}
+
+function changePageSize(newSize) {
+  pageSize.value = newSize
+  savePageSize(newSize)
+  currentPage.value = 1
+  pageDirection.value = 'left'
+  loadUsers(1)
+}
+
+async function loadRoles() {
+  loadingRoles.value = true
+  try {
+    const roleData = await api.getAdminRoles(auth.accessToken, auth.setAccessToken)
+    roles.value = roleData.map((role) => role.name)
+  } catch {
+    roles.value = ['user', 'admin']
+  } finally {
+    loadingRoles.value = false
+  }
+}
+
+async function submitAction() {
+  if (!currentUser.value) return
+  actionError.value = ''
+  actionSuccess.value = ''
+
+  const trimmedEmail = confirmEmailInput.value.trim()
+  if (!trimmedEmail) {
+    actionError.value = 'Enter the user email to confirm.'
+    return
+  }
+
+  const payload = { confirm_email: trimmedEmail }
+
+  if (currentAction.value === 'editUsername') {
+    const username = actionForm.username.trim()
+    if (!username) {
+      actionError.value = 'Username cannot be empty.'
+      return
+    }
+    payload.username = username
+  }
+
+  if (currentAction.value === 'changePassword') {
+    if (!actionForm.newPassword) {
+      actionError.value = 'Enter a new password.'
+      return
+    }
+    if (actionForm.newPassword !== actionForm.newPasswordConfirm) {
+      actionError.value = 'Password confirmation does not match.'
+      return
+    }
+    payload.new_password = actionForm.newPassword
+    payload.new_password_confirm = actionForm.newPasswordConfirm
+  }
+
+  if (currentAction.value === 'changeRole') {
+    if (!actionForm.role) {
+      actionError.value = 'Choose a role.'
+      return
+    }
+    payload.role = actionForm.role
+  }
+
+  actionSubmitting.value = true
+  try {
+    if (currentAction.value === 'deleteUser') {
+      await api.deleteUserByAdmin(
+        currentUser.value.id,
+        payload,
+        auth.accessToken,
+        auth.setAccessToken,
+      )
+      actionSuccess.value = 'User deleted successfully.'
+    } else {
+      await api.updateUserByAdmin(
+        currentUser.value.id,
+        payload,
+        auth.accessToken,
+        auth.setAccessToken,
+      )
+      actionSuccess.value = 'User updated successfully.'
+    }
+    await loadUsers()
+    if (currentAction.value === 'deleteUser') {
+      closeModal()
+      pageSuccess.value = 'User deleted successfully.'
+    } else {
+      confirmEmailInput.value = ''
+    }
+  } catch (error) {
+    actionError.value = error.message || 'Failed to complete action.'
+  } finally {
+    actionSubmitting.value = false
+  }
+}
+
+function goToPage(page) {
+  if (page < 1 || page > totalPages.value || page === currentPage.value) {
+    return
+  }
+  pageDirection.value = page > currentPage.value ? 'left' : 'right'
+  loadUsers(page)
+}
+
+function previousPage() {
+  goToPage(currentPage.value - 1)
+}
+
+function nextPage() {
+  goToPage(currentPage.value + 1)
+}
+
+onMounted(async () => {
+  if (!auth.isAdmin) return
+  await Promise.all([loadUsers(), loadRoles()])
+})
+</script>
+
+<template>
+  <div>
+    <div
+      class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden"
+    >
+      <div class="px-5 py-5 sm:px-6 border-b border-slate-200 dark:border-slate-800">
+        <p
+          class="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
+        >
+          User management
+        </p>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1.5">
+          View all accounts, change roles, update usernames or passwords, and delete users.
+        </p>
+      </div>
+      <div class="px-5 py-5 sm:px-6">
+        <div
+          v-if="pageError"
+          class="rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300"
+        >
+          Something went wrong.
+        </div>
+        <div
+          v-if="pageSuccess"
+          class="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300"
+        >
+          {{ pageSuccess }}
+        </div>
+
+        <div
+          v-if="!auth.isAdmin"
+          class="rounded-2xl border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/40 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300"
+        >
+          You do not have permission to manage users.
+        </div>
+
+        <div v-else>
+          <div
+            v-if="loadingUsers && users.length === 0"
+            class="text-center py-8 text-slate-600 dark:text-slate-400"
+          >
+            Loading users…
+          </div>
+
+          <div
+            v-else-if="users.length === 0"
+            class="rounded-2xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 p-6 text-center text-slate-600 dark:text-slate-400"
+          >
+            No users found.
+          </div>
+
+          <transition :name="transitionName" mode="out-in">
+            <div :key="pageKey" class="space-y-4">
+              <!-- <div
+              v-if="loadingUsers"
+              class="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700"
+            >
+              Loading page {{ currentPage }}…
+            </div> -->
+              <div class="space-y-4 sm:hidden">
+                <div
+                  v-for="user in users"
+                  :key="user.id"
+                  class="rounded-3xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"
+                >
+                  <div class="flex flex-col gap-3">
+                    <div class="flex items-start justify-between gap-4">
+                      <div>
+                        <p class="text-base font-semibold text-slate-900 dark:text-slate-100">
+                          {{ user.username }}
+                        </p>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 break-words">
+                          {{ user.email }}
+                        </p>
+                      </div>
+                      <span
+                        class="whitespace-nowrap rounded-full bg-slate-100 dark:bg-slate-700 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300"
+                      >
+                        {{ user.role }}
+                      </span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        class="w-full rounded-2xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-left text-sm font-medium text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-600"
+                        @click="openAction(user, 'editUsername')"
+                      >
+                        Edit name
+                      </button>
+                      <button
+                        type="button"
+                        class="w-full rounded-2xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-left text-sm font-medium text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-600"
+                        @click="openAction(user, 'changePassword')"
+                      >
+                        Change password
+                      </button>
+                      <button
+                        type="button"
+                        class="w-full rounded-2xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-left text-sm font-medium text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-600"
+                        @click="openAction(user, 'changeRole')"
+                      >
+                        Change role
+                      </button>
+                      <button
+                        type="button"
+                        class="w-full rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-left text-sm font-medium text-red-700 dark:text-red-400 transition hover:bg-red-100 dark:hover:bg-red-950/60"
+                        @click="openAction(user, 'deleteUser')"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="hidden sm:block overflow-auto rounded-xl border border-slate-200 dark:border-slate-700"
+              >
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                  <thead class="bg-gray-50 dark:bg-slate-800">
+                    <tr>
+                      <th
+                        class="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-300"
+                      >
+                        Username
+                      </th>
+                      <th
+                        class="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-300"
+                      >
+                        Email
+                      </th>
+                      <th
+                        class="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-300"
+                      >
+                        Role
+                      </th>
+                      <th
+                        class="px-4 py-3 text-right text-sm font-semibold text-slate-700 dark:text-slate-300"
+                      >
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody
+                    class="divide-y divide-gray-200 dark:divide-slate-700 bg-white dark:bg-slate-900"
+                  >
+                    <tr v-for="user in users" :key="user.id">
+                      <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                        {{ user.username }}
+                      </td>
+                      <td
+                        class="px-4 py-3 text-sm text-slate-500 dark:text-slate-400 wrap-break-word"
+                      >
+                        {{ user.email }}
+                      </td>
+                      <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                        {{ user.role }}
+                      </td>
+                      <td class="px-4 py-3 text-sm text-right text-slate-700 dark:text-slate-200">
+                        <div class="flex flex-wrap justify-end gap-2">
+                          <button
+                            type="button"
+                            class="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700"
+                            @click="openAction(user, 'editUsername')"
+                          >
+                            Edit name
+                          </button>
+                          <button
+                            type="button"
+                            class="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700"
+                            @click="openAction(user, 'changePassword')"
+                          >
+                            Change password
+                          </button>
+                          <button
+                            type="button"
+                            class="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700"
+                            @click="openAction(user, 'changeRole')"
+                          >
+                            Change role
+                          </button>
+                          <button
+                            type="button"
+                            class="inline-flex items-center rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-3 py-1 text-xs font-medium text-red-700 dark:text-red-400 transition hover:bg-red-100 dark:hover:bg-red-950/60"
+                            @click="openAction(user, 'deleteUser')"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </transition>
+
+          <div
+            class="mt-4 flex flex-col gap-3 border-t border-gray-200 dark:border-slate-700 pt-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+              <p class="text-sm text-slate-600 dark:text-slate-400">
+                Showing page {{ currentPage }} of {{ totalPages }} — {{ totalUsers }} user{{
+                  totalUsers === 1 ? '' : 's'
+                }}
+                total.
+              </p>
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-slate-700 dark:text-slate-300"
+                  >Page size</label
+                >
+                <select
+                  v-model.number="pageSize"
+                  @change="changePageSize(pageSize)"
+                  class="rounded-2xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 outline-none transition focus:border-slate-400 dark:focus:border-slate-500"
+                >
+                  <option v-for="size in pageSizeOptions" :key="size" :value="size">
+                    {{ size }}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="inline-flex items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="currentPage <= 1"
+                @click="previousPage"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="currentPage >= totalPages"
+                @click="nextPage"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <Modal
+      :model-value="modalOpen"
+      :title="actionDetails[currentAction]?.title || 'Manage user'"
+      @update:modelValue="
+        (value) => {
+          modalOpen = value
+          if (!value) closeModal()
+        }
+      "
+      @close="closeModal"
+    >
+      <div v-if="currentUser" class="space-y-4">
+        <p class="text-sm text-slate-600 dark:text-slate-400">
+          {{ actionDetails[currentAction]?.description }}
+        </p>
+
+        <div v-if="currentAction === 'editUsername'" class="space-y-4">
+          <TextInput
+            v-model="actionForm.username"
+            label="New username"
+            autocomplete="username"
+            required
+          />
+        </div>
+
+        <div v-if="currentAction === 'changePassword'" class="space-y-4">
+          <PasswordInput
+            v-model="actionForm.newPassword"
+            label="New password"
+            autocomplete="new-password"
+            required
+          />
+          <PasswordInput
+            v-model="actionForm.newPasswordConfirm"
+            label="Confirm password"
+            autocomplete="new-password"
+            required
+          />
+        </div>
+
+        <div v-if="currentAction === 'changeRole'" class="space-y-4">
+          <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Role</label>
+          <select
+            v-model="actionForm.role"
+            class="w-full rounded-2xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-3 text-sm text-slate-700 dark:text-slate-200 outline-none transition focus:border-slate-400 dark:focus:border-slate-500"
+          >
+            <option value="" disabled>Select role</option>
+            <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
+          </select>
+        </div>
+
+        <div class="space-y-2">
+          <TextInput
+            v-model="confirmEmailInput"
+            label="Confirm user email"
+            autocomplete="email"
+            placeholder="Type the user's email to confirm"
+            required
+          />
+          <p class="text-sm text-slate-500 dark:text-slate-400">
+            This action requires typing the exact email address of
+            <strong>{{ currentUser.email }}</strong
+            >.
+          </p>
+        </div>
+
+        <div
+          v-if="actionError"
+          class="rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300"
+        >
+          {{ actionError }}
+        </div>
+        <div
+          v-if="actionSuccess"
+          class="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300"
+        >
+          {{ actionSuccess }}
+        </div>
+
+        <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            class="btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
+            @click="closeModal"
+            :disabled="actionSubmitting"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn bg-primary text-white hover:bg-primary-dark"
+            :disabled="actionSubmitting"
+            @click="submitAction"
+          >
+            {{ actionSubmitting ? 'Saving…' : actionLabel }}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  </div>
+</template>
+
+<style scoped>
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition:
+    transform 0.25s ease,
+    opacity 0.25s ease;
+}
+
+.slide-left-enter-from,
+.slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+.slide-left-enter-to,
+.slide-right-leave-from {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.slide-left-leave-from,
+.slide-right-enter-to {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.slide-left-leave-to,
+.slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-100%);
+}
+</style>
