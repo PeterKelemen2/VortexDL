@@ -102,6 +102,33 @@ const api = {
   refresh: () => request('/auth/refresh', { method: 'POST', headers: getCsrfHeader() }),
   logout: () => request('/auth/logout', { method: 'POST', headers: getCsrfHeader() }),
 
+  requestEmailVerification: (email) =>
+    request('/auth/verify-email/request', { method: 'POST', body: { email } }),
+  verifyEmail: (token) => request('/auth/verify-email', { method: 'POST', body: { token } }),
+  requestPasswordReset: (email) =>
+    request('/auth/password-reset/request', { method: 'POST', body: { email } }),
+  resetPassword: (payload) => request('/auth/password-reset', { method: 'POST', body: payload }),
+
+  // --- Two-factor authentication ---
+  getTwoFactorStatus: (token, onTokenRefresh) =>
+    requestWithAuth('/auth/2fa/status', { token, onTokenRefresh }),
+  setupTwoFactor: (token, onTokenRefresh) =>
+    requestWithAuth('/auth/2fa/setup', { method: 'POST', token, onTokenRefresh }),
+  verifyTwoFactor: (code, token, onTokenRefresh) =>
+    requestWithAuth('/auth/2fa/verify', { method: 'POST', body: { code }, token, onTokenRefresh }),
+  disableTwoFactor: (password, token, onTokenRefresh) =>
+    requestWithAuth('/auth/2fa/disable', { method: 'POST', body: { password }, token, onTokenRefresh }),
+  regenerateBackupCodes: (code, token, onTokenRefresh) =>
+    requestWithAuth('/auth/2fa/backup-codes', { method: 'POST', body: { code }, token, onTokenRefresh }),
+
+  // --- API keys ---
+  listApiKeys: (token, onTokenRefresh) =>
+    requestWithAuth('/api-keys', { token, onTokenRefresh }),
+  createApiKey: (payload, token, onTokenRefresh) =>
+    requestWithAuth('/api-keys', { method: 'POST', body: payload, token, onTokenRefresh }),
+  revokeApiKey: (keyId, token, onTokenRefresh) =>
+    requestWithAuth(`/api-keys/${keyId}`, { method: 'DELETE', token, onTokenRefresh }),
+
   getCurrentUser: (token, onTokenRefresh) => requestWithAuth('/auth/me', { token, onTokenRefresh }),
   getSessions: (token, onTokenRefresh) => requestWithAuth('/auth/sessions', { token, onTokenRefresh }),
   revokeSession: (sessionId, token, onTokenRefresh) => requestWithAuth(`/auth/sessions/${sessionId}`, {
@@ -130,6 +157,12 @@ const api = {
     { token, onTokenRefresh },
   ),
   getAdminRoles: (token, onTokenRefresh) => requestWithAuth('/admin/roles', { token, onTokenRefresh }),
+  listAuditLogs: ({ page = 1, pageSize = 50, action = '', userId = null } = {}, token, onTokenRefresh) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (action) params.set('action', action)
+    if (userId != null && userId !== '') params.set('user_id', String(userId))
+    return requestWithAuth(`/admin/audit-logs?${params.toString()}`, { token, onTokenRefresh })
+  },
   updateUserByAdmin: (userId, payload, token, onTokenRefresh) => requestWithAuth(`/admin/users/${userId}`, {
     method: 'PATCH',
     body: payload,

@@ -3,6 +3,8 @@ import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/utils/api'
 import Modal from '@/components/Modal.vue'
+import TwoFactorSettings from '@/components/TwoFactorSettings.vue'
+import ApiKeysSettings from '@/components/ApiKeysSettings.vue'
 
 const auth = useAuthStore()
 
@@ -79,6 +81,8 @@ onMounted(loadSessions)
 
 <template>
   <div>
+    <TwoFactorSettings />
+    <ApiKeysSettings />
     <div
       class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden"
     >
