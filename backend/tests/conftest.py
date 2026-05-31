@@ -18,7 +18,7 @@ os.environ["ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING"] = "false"
 os.environ["RATE_LIMIT_ENABLED"] = "false"
 
 # Use a temporary SQLite database file for test isolation.
-_db_handle, _db_path = tempfile.mkstemp(prefix="ytdlp_client_test_", suffix=".db")
+_db_handle, _db_path = tempfile.mkstemp(prefix="vortex_dl_test_", suffix=".db")
 os.close(_db_handle)
 os.environ.setdefault("SQLALCHEMY_DATABASE_URI", f"sqlite+aiosqlite:///{_db_path}")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost")

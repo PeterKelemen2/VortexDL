@@ -1,0 +1,20 @@
+services:
+  vortex-dl:
+    image: vortex-dl-test
+    env_file:
+      - test.env
+    volumes:
+      - ./test-data:/app/data
+      - ./test-uploads:/app/uploads
+      - ./test-downloads:/app/downloads
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes: {}

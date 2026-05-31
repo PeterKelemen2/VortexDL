@@ -1,20 +1,43 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
+def _read_version() -> str:
+    """Read the canonical version from the VERSION file.
+
+    Search order:
+    1. APP_VERSION env var (allows CI/runtime override)
+    2. VERSION file at the repo root (works for local dev and Docker)
+    """
+    if v := os.getenv("APP_VERSION"):
+        return v.strip()
+    # backend/app/core/config.py → parents[3] is the repo root when running
+    # locally.  In the combined Docker image the file lands at /app/VERSION.
+    candidates = [
+        Path(__file__).resolve().parents[3] / "VERSION",
+        Path("/app/VERSION"),
+    ]
+    for path in candidates:
+        if path.exists():
+            return path.read_text().strip()
+    return "dev"
+
+
 class Settings:
     APP_NAME = os.getenv("APP_NAME", "Downloader API")
+    APP_VERSION: str = _read_version()
     DEBUG = os.getenv("DEBUG", "false") == "true"
-    SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite+aiosqlite:///./app.db")
+    SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite+aiosqlite:////app/data/app.db")
     JWT_SECRET = os.getenv("JWT_SECRET")
     if not JWT_SECRET:
         raise RuntimeError("JWT_SECRET must be set in environment")
     if len(JWT_SECRET) < 32:
         raise RuntimeError("JWT_SECRET must be at least 32 characters long (use a cryptographically random value)")
-    JWT_ISSUER = os.getenv("JWT_ISSUER", "ytdlp_client")
-    JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "ytdlp_client")
+    JWT_ISSUER = os.getenv("JWT_ISSUER", "vortex_dl")
+    JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "vortex_dl")
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
     # Restrict to a vetted allowlist so a misconfigured environment can never
     # select the "none" algorithm (which would disable signature verification).

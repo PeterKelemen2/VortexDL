@@ -1,4 +1,4 @@
-# ytdlp_client
+# VortexDL
 
 A self-hosted downloader frontend/backend stack.
 
