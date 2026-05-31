@@ -1,23 +1,45 @@
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from app.api.routes import health, auth, admin
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+from app.api.routes import health, auth, admin, jobs, api_keys
 from app.core.config import settings
 from app.core.db import async_session
+
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL, logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+from app.core.rate_limit import limiter
+from app.core.job_queue import job_queue
 from app.services.auth_service import bootstrap_initial_admin
+from app.services.download_service import DOWNLOAD_JOB_TYPE, download_handler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with async_session() as db:
         await bootstrap_initial_admin(db)
-    yield
+    # Background job queue: register handlers and start workers.
+    job_queue.concurrency = settings.JOB_WORKER_CONCURRENCY
+    job_queue.register(DOWNLOAD_JOB_TYPE, download_handler)
+    await job_queue.start()
+    try:
+        yield
+    finally:
+        await job_queue.stop()
 
 
 app = FastAPI(title="Downloader API", lifespan=lifespan)
+
+# Rate limiting (slowapi)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 upload_root = Path(settings.PROFILE_IMAGE_UPLOAD_DIR)
 upload_root.mkdir(parents=True, exist_ok=True)
@@ -34,3 +56,5 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(admin.router)
+app.include_router(jobs.router)
+app.include_router(api_keys.router)

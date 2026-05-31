@@ -14,6 +14,8 @@ os.environ["INITIAL_ADMIN_USERNAME"] = ""
 os.environ["INITIAL_ADMIN_EMAIL"] = ""
 os.environ["INITIAL_ADMIN_PASSWORD"] = ""
 os.environ["ADMIN_BOOTSTRAP_FORCE_ELEVATE_EXISTING"] = "false"
+# Disable rate limiting so the test suite can hammer auth endpoints freely.
+os.environ["RATE_LIMIT_ENABLED"] = "false"
 
 # Use a temporary SQLite database file for test isolation.
 _db_handle, _db_path = tempfile.mkstemp(prefix="ytdlp_client_test_", suffix=".db")

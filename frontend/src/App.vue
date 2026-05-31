@@ -5,6 +5,8 @@ import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import TopBar from '@/components/TopBar.vue'
 import SideBar from '@/components/SideBar.vue'
+import ToastContainer from '@/components/ToastContainer.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -35,6 +37,8 @@ const showShell = computed(() => auth.isAuthenticated && !route.meta.guestOnly)
   <template v-else>
     <router-view />
   </template>
+  <ToastContainer />
+  <ConfirmDialog />
 </template>
 
 <style scoped></style>

@@ -4,9 +4,23 @@ import secrets
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.dependencies import get_db, get_current_user
+from app.core.dependencies import get_db, get_current_user, get_current_user_flexible
 from app.core.config import settings
-from app.schemas.auth import TokenResponse, TokenRefreshRequest, RefreshTokenSession
+from app.schemas.auth import (
+    TokenResponse,
+    TokenRefreshRequest,
+    RefreshTokenSession,
+    MessageResponse,
+    EmailVerificationRequest,
+    EmailVerificationConfirm,
+    PasswordResetRequest,
+    PasswordResetConfirm,
+    TwoFactorSetupResponse,
+    TwoFactorVerifyRequest,
+    TwoFactorDisableRequest,
+    TwoFactorStatusResponse,
+    BackupCodesResponse,
+)
 from app.schemas.user import (
     UserImageCrop,
     UserImageRead,
@@ -25,6 +39,14 @@ from app.services.auth_service import (
     get_user_info,
     update_current_user,
 )
+from app.services.account_service import (
+    request_email_verification,
+    verify_email,
+    request_password_reset,
+    reset_password,
+)
+from app.core.rate_limit import limiter
+from app.services import twofactor_service
 from app.services.user_image_service import (
     activate_user_profile_image,
     create_user_profile_image,
@@ -99,11 +121,13 @@ def _require_csrf(request: Request) -> None:
 
 
 @router.post("/register", response_model=UserRead)
-async def register(user_in: UserRegister, db: AsyncSession = Depends(get_db)):
+@limiter.limit(settings.RATE_LIMIT_REGISTER)
+async def register(user_in: UserRegister, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     return await register_user(user_in, db)
 
 
 @router.post("/login", response_model=TokenResponse, response_model_exclude_none=True)
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
 async def login(
     form: UserLogin,
     request: Request,
@@ -135,6 +159,7 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponse, response_model_exclude_none=True)
+@limiter.limit(settings.RATE_LIMIT_REFRESH)
 async def refresh(
     request: Request,
     response: Response,
@@ -171,6 +196,94 @@ async def logout(
     _clear_csrf_cookie(response, request)
     await logout_refresh_token(TokenRefreshRequest(refresh_token=refresh_token), db)
     return {"msg": "Logged out"}
+
+
+@router.post("/verify-email/request", response_model=MessageResponse)
+@limiter.limit(settings.RATE_LIMIT_EMAIL_VERIFICATION)
+async def request_verification(
+    payload: EmailVerificationRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    return await request_email_verification(payload, db)
+
+
+@router.post("/verify-email", response_model=MessageResponse)
+@limiter.limit(settings.RATE_LIMIT_EMAIL_VERIFICATION)
+async def confirm_verification(
+    payload: EmailVerificationConfirm,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    return await verify_email(payload, db)
+
+
+@router.post("/password-reset/request", response_model=MessageResponse)
+@limiter.limit(settings.RATE_LIMIT_PASSWORD_RESET)
+async def request_reset(
+    payload: PasswordResetRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    return await request_password_reset(payload, db)
+
+
+@router.post("/password-reset", response_model=MessageResponse)
+@limiter.limit(settings.RATE_LIMIT_PASSWORD_RESET)
+async def confirm_reset(
+    payload: PasswordResetConfirm,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    return await reset_password(payload, db)
+
+
+@router.get("/2fa/status", response_model=TwoFactorStatusResponse)
+async def twofactor_status(current_user: User = Depends(get_current_user)):
+    return TwoFactorStatusResponse(enabled=current_user.totp_enabled)
+
+
+@router.post("/2fa/setup", response_model=TwoFactorSetupResponse)
+async def twofactor_setup(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    data = await twofactor_service.start_setup(current_user, db)
+    return TwoFactorSetupResponse(**data)
+
+
+@router.post("/2fa/verify", response_model=TwoFactorStatusResponse)
+async def twofactor_verify(
+    payload: TwoFactorVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await twofactor_service.confirm_setup(current_user, payload.code, db)
+    return TwoFactorStatusResponse(enabled=True)
+
+
+@router.post("/2fa/disable", response_model=TwoFactorStatusResponse)
+async def twofactor_disable(
+    payload: TwoFactorDisableRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await twofactor_service.disable(current_user, payload.password, db)
+    return TwoFactorStatusResponse(enabled=False)
+
+
+@router.post("/2fa/backup-codes", response_model=BackupCodesResponse)
+async def twofactor_regenerate_backup_codes(
+    payload: TwoFactorVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    codes = await twofactor_service.regenerate_backup_codes(current_user, payload.code, db)
+    return BackupCodesResponse(backup_codes=codes)
 
 
 @router.get("/sessions", response_model=list[RefreshTokenSession])
@@ -216,7 +329,7 @@ async def revoke_session(
     return None
 
 @router.get("/me", response_model=UserRead)
-async def me(current_user: User = Depends(get_current_user)):
+async def me(current_user: User = Depends(get_current_user_flexible)):
     return get_user_info(current_user)
 
 

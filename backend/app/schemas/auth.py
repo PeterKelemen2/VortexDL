@@ -1,5 +1,9 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from datetime import datetime
+from typing import Annotated
+
+# Strict password type reused from the registration flow.
+Password = Annotated[str, Field(min_length=12, max_length=128)]
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -20,3 +24,49 @@ class RefreshTokenSession(BaseModel):
     current: bool = False
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MessageResponse(BaseModel):
+    msg: str
+
+
+class EmailVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class EmailVerificationConfirm(BaseModel):
+    token: str = Field(min_length=1, max_length=512)
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=1, max_length=512)
+    new_password: Password
+    new_password_confirm: str = Field(min_length=1, max_length=128)
+
+
+# --- Two-factor authentication ---------------------------------------------
+class TwoFactorSetupResponse(BaseModel):
+    secret: str
+    otpauth_uri: str
+    qr_code: str  # data:image/png;base64,... URI
+    backup_codes: list[str]
+
+
+class TwoFactorVerifyRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=32)
+
+
+class TwoFactorDisableRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
+class TwoFactorStatusResponse(BaseModel):
+    enabled: bool
+
+
+class BackupCodesResponse(BaseModel):
+    backup_codes: list[str]
