@@ -75,4 +75,13 @@ class Settings:
     # Root directory where downloaded files are written (per-user subdirectories).
     DOWNLOAD_DIR = os.getenv("DOWNLOAD_DIR", "./downloads")
 
+    # --- Remote (SSH/SFTP) downloads -------------------------------------------
+    # Symmetric key used to encrypt stored remote-machine passwords at rest.
+    # Derived from JWT_SECRET when unset so deployments work out of the box.
+    REMOTE_SECRET_KEY = os.getenv("REMOTE_SECRET_KEY") or JWT_SECRET
+    # Seconds an idle pooled SSH connection is kept alive before being recycled.
+    SSH_CONNECT_TIMEOUT = int(os.getenv("SSH_CONNECT_TIMEOUT", "15"))
+    # Maximum number of entries returned by a single remote folder browse call.
+    REMOTE_BROWSE_MAX_ENTRIES = int(os.getenv("REMOTE_BROWSE_MAX_ENTRIES", "1000"))
+
 settings = Settings()

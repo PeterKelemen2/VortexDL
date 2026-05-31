@@ -21,9 +21,33 @@ from typing import Awaitable, Callable, Optional
 from sqlalchemy import select
 
 from app.core.db import async_session
+from app.core.sse_bus import sse_bus
 from app.models.job import Job, JobStatus
 
 logger = logging.getLogger("app.job_queue")
+
+
+def _job_event(job: Job) -> dict:
+    """Serialize a job into the SSE payload shape consumed by the frontend."""
+    return {
+        "id": job.id,
+        "job_type": job.job_type,
+        "status": JobStatus(job.status).value,
+        "progress": job.progress,
+        "destination_type": job.destination_type,
+        "remote_machine_id": job.remote_machine_id,
+        "error": job.error,
+        "result": json.loads(job.result) if job.result else None,
+        "payload": json.loads(job.payload) if job.payload else None,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+    }
+
+
+def _emit(job: Job) -> None:
+    sse_bus.emit(job.user_id, "job_update", _job_event(job))
+
 
 
 @dataclass
@@ -101,6 +125,7 @@ class JobQueue:
             job = await db.get(Job, job_id)
             if job and not JobStatus(job.status).is_terminal:
                 job.progress = percent
+                _emit(job)
                 await db.commit()
 
     async def _worker(self, index: int) -> None:
@@ -134,10 +159,12 @@ class JobQueue:
                 job.status = JobStatus.failed
                 job.error = f"No handler registered for job_type '{job.job_type}'"
                 job.finished_at = datetime.now(timezone.utc)
+                _emit(job)
                 await db.commit()
                 return
             job.status = JobStatus.running
             job.started_at = datetime.now(timezone.utc)
+            _emit(job)
             await db.commit()
 
         ctx = JobContext(
@@ -167,6 +194,7 @@ class JobQueue:
             job.result = json.dumps(result) if result is not None else None
             job.progress = 100 if status == JobStatus.finished else job.progress
             job.finished_at = datetime.now(timezone.utc)
+            _emit(job)
             await db.commit()
 
 

@@ -4,6 +4,7 @@
 __pycache__
 *.db
 uploads
+downloads
 
 # Python cache and test artifacts
 *.pyc

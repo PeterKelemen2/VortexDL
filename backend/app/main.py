@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 from pathlib import Path
 
@@ -7,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
-from app.api.routes import health, auth, admin, jobs, api_keys
+from app.api.routes import health, auth, admin, jobs, api_keys, remote_machines
 from app.core.config import settings
 from app.core.db import async_session
 
@@ -17,12 +18,19 @@ logging.basicConfig(
 )
 from app.core.rate_limit import limiter
 from app.core.job_queue import job_queue
+from app.core.ssh_pool import ssh_pool
 from app.services.auth_service import bootstrap_initial_admin
 from app.services.download_service import DOWNLOAD_JOB_TYPE, download_handler
 
 
+# Signalled during shutdown so long-lived streaming connections (SSE) can exit.
+shutdown_event: asyncio.Event | None = None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global shutdown_event
+    shutdown_event = asyncio.Event()
     async with async_session() as db:
         await bootstrap_initial_admin(db)
     # Background job queue: register handlers and start workers.
@@ -32,7 +40,10 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        if shutdown_event:
+            shutdown_event.set()
         await job_queue.stop()
+        await ssh_pool.close_all()
 
 
 app = FastAPI(title="Downloader API", lifespan=lifespan)
@@ -58,3 +69,5 @@ app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(jobs.router)
 app.include_router(api_keys.router)
+app.include_router(remote_machines.admin_router)
+app.include_router(remote_machines.user_router)

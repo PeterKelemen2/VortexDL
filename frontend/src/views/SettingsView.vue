@@ -6,7 +6,8 @@ import AccountSettings from '@/components/AccountSettings.vue'
 import SecuritySettings from '@/components/SecuritySettings.vue'
 import UsersSettings from '@/components/UsersSettings.vue'
 import AuditLogSettings from '@/components/AuditLogSettings.vue'
-import { ContactRound, Users, Shield, ScrollText } from 'lucide-vue-next'
+import RemoteMachinesSettings from '@/components/RemoteMachinesSettings.vue'
+import { ContactRound, Users, Shield, ScrollText, Server } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
@@ -43,6 +44,16 @@ const menuItems = computed(() => {
       query: { tab: 'users' },
       component: UsersSettings,
       description: 'Administer user accounts and roles.',
+    })
+    items.push({
+      id: 'remote-machines',
+      label: 'Remote machines',
+      icon: Server,
+      route: 'settings',
+      query: { tab: 'remote-machines' },
+      component: RemoteMachinesSettings,
+      description: 'Configure SSH targets and assign user access.',
+      wide: true,
     })
     items.push({
       id: 'audit',

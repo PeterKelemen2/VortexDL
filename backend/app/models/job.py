@@ -62,6 +62,16 @@ class Job(Base):
     # Integer progress 0-100 for long-running work.
     progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
+    # Where the finished artifact is delivered: local (browser), remote (SSH/SFTP),
+    # or both. Stored as a plain string to keep the queue handler simple.
+    destination_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="local"
+    )
+    # Target machine when destination_type is "remote" or "both".
+    remote_machine_id: Mapped[int | None] = mapped_column(
+        ForeignKey("remote_machines.id", ondelete="SET NULL"), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
