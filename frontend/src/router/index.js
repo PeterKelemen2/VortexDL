@@ -3,7 +3,6 @@ import RegisterView from '@/views/RegisterView.vue'
 import LoginView from '@/views/LoginView.vue'
 import HomeView from '@/views/HomeView.vue'
 import SettingsView from '@/views/SettingsView.vue'
-import AdminView from '@/views/AdminView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import ForbiddenView from '@/views/ForbiddenView.vue'
 import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
@@ -16,7 +15,6 @@ import { BRAND_NAME, BRAND_ICON } from '@/constants/branding'
 const routes = [
   { path: '/', name: 'home', component: HomeView, meta: { title: '', requiresAuth: true } },
   { path: '/settings', name: 'settings', component: SettingsView, meta: { title: 'Settings', requiresAuth: true } },
-  { path: '/admin', name: 'admin', component: AdminView, meta: { title: 'Admin', requiresAuth: true, requiresAdmin: true } },
   { path: '/not-found', name: 'not-found', component: NotFoundView, meta: { title: 'Not Found' } },
   { path: '/forbidden', name: 'forbidden', component: ForbiddenView, meta: { title: 'Forbidden' } },
   { path: '/register', name: 'register', component: RegisterView, meta: { title: 'Register', guestOnly: true } },

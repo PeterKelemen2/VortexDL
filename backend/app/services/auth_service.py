@@ -588,5 +588,12 @@ async def update_current_user(current_user: User, user_update: UserUpdate, db: A
 
     current_user.updated_at = datetime.now(timezone.utc)
     await db.commit()
-    await db.refresh(current_user)
+    # Re-fetch with relationships to avoid lazy-load MissingGreenlet after expiry on commit
+    stmt = (
+        select(User)
+        .where(User.id == current_user.id)
+        .options(selectinload(User.role), selectinload(User.images))
+    )
+    result = await db.execute(stmt)
+    current_user = result.scalar_one()
     return get_user_info(current_user)

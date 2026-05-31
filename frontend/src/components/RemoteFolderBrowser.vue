@@ -2,7 +2,7 @@
 import { watch, computed } from 'vue'
 import { useRemoteMachinesStore } from '@/stores/remoteMachines'
 import Modal from '@/components/Modal.vue'
-import { Folder, File as FileIcon, ChevronUp, Check } from 'lucide-vue-next'
+import { Folder, File as FileIcon, ChevronUp, Check, RefreshCw } from 'lucide-vue-next'
 
 const open = defineModel({ type: Boolean, required: true })
 
@@ -33,6 +33,10 @@ function formatSize(bytes) {
 
 function selectCurrent() {
   emit('select', store.currentPath)
+}
+
+function retryBrowse() {
+  store.browse(props.machineId, store.currentPath).catch(() => {})
 }
 
 watch(
@@ -76,7 +80,15 @@ watch(
           v-else-if="store.browseError"
           class="px-3 py-6 text-center text-sm text-red-600 dark:text-red-400"
         >
-          {{ store.browseError }}
+          <p>{{ store.browseError }}</p>
+          <button
+            type="button"
+            class="mt-3 inline-flex items-center gap-1.5 rounded-md border border-red-300 dark:border-red-500/40 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+            @click="retryBrowse"
+          >
+            <RefreshCw class="w-3.5 h-3.5" />
+            Try again
+          </button>
         </div>
         <div
           v-else-if="store.entries.length === 0"

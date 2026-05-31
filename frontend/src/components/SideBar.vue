@@ -28,7 +28,7 @@ const navItems = computed(() => {
     { label: 'Settings', icon: Settings, route: 'settings', query: { tab: 'account' } },
   ]
   if (auth.isAdmin) {
-    items.push({ label: 'Admin', icon: ShieldCheck, route: 'admin' })
+    // items.push({ label: 'Admin', icon: ShieldCheck, route: 'admin' })
   }
   return items
 })
@@ -79,14 +79,18 @@ const avatarStyle = computed(() => {
       class="fixed left-0 top-0 z-50 flex h-full w-72 flex-col bg-white dark:bg-linear-to-b dark:from-slate-900 dark:to-slate-950 shadow-2xl border-r border-slate-200 dark:border-transparent"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-white/10">
+      <div
+        class="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-white/10"
+      >
         <div class="flex items-center gap-2.5">
           <div
             class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/20 text-blue-500 dark:text-blue-400"
           >
             <component :is="BRAND_ICON" class="h-4 w-4" />
           </div>
-          <span class="text-base font-bold tracking-tight text-slate-900 dark:text-white">{{ BRAND_NAME }}</span>
+          <span class="text-base font-bold tracking-tight text-slate-900 dark:text-white">{{
+            BRAND_NAME
+          }}</span>
         </div>
         <button
           type="button"
@@ -116,11 +120,16 @@ const avatarStyle = computed(() => {
             :is="item.icon"
             :class="[
               'h-4 w-4 shrink-0 transition-colors',
-              isActive(item) ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300',
+              isActive(item)
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300',
             ]"
           />
           {{ item.label }}
-          <span v-if="isActive(item)" class="ml-auto h-1.5 w-1.5 rounded-full bg-blue-500 dark:bg-blue-400" />
+          <span
+            v-if="isActive(item)"
+            class="ml-auto h-1.5 w-1.5 rounded-full bg-blue-500 dark:bg-blue-400"
+          />
         </button>
       </nav>
 
@@ -172,10 +181,15 @@ const avatarStyle = computed(() => {
             <span v-else>{{ useUserInitials(auth.user?.username ?? '') }}</span>
           </div>
           <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ auth.user?.username }}</p>
+            <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+              {{ auth.user?.username }}
+            </p>
             <p class="truncate text-xs text-slate-500">{{ auth.user?.role }}</p>
           </div>
-          <ShieldCheck v-if="auth.isAdmin" class="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" />
+          <ShieldCheck
+            v-if="auth.isAdmin"
+            class="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400"
+          />
         </div>
       </div>
     </aside>

@@ -9,7 +9,7 @@ from app.models.refresh_token import RefreshToken
 from app.schemas.user import UserRead, UserAdminUpdate, UserAdminDelete
 from app.services.auth_service import validate_password_strength, hash_password
 
-async def get_all_users(db: AsyncSession, page: int = 1, page_size: int = 10):
+async def get_all_users(db: AsyncSession, page: int = 1, page_size: int = 20):
     count_stmt = select(func.count()).select_from(User)
     result = await db.execute(count_stmt)
     total = result.scalar_one()

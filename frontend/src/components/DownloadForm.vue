@@ -90,6 +90,17 @@ async function submit() {
     toast.error('Enter a URL to download')
     return
   }
+  let parsed
+  try {
+    parsed = new URL(trimmed)
+  } catch {
+    toast.error('Enter a valid URL')
+    return
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    toast.error('Only http and https URLs are supported')
+    return
+  }
   if (
     (destination.destination_type === 'remote' || destination.destination_type === 'both') &&
     !destination.remote_machine_id

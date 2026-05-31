@@ -1,0 +1,26 @@
+services:
+  vortex-dl:
+    image: ghcr.io/peterkelemen2/vortex-dl:latest # or pin to e.g. :1.0.0
+    env_file:
+      - .env
+    environment:
+      JWT_SECRET: at-least-32-chars-random-secret
+      INITIAL_ADMIN_USERNAME: admin
+      INITIAL_ADMIN_EMAIL: admin@example.com
+      INITIAL_ADMIN_PASSWORD: <strong-password>
+      CORS_ORIGINS: http://localhost
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+      - ./downloads:/app/downloads
+    ports:
+      - "80:80" # change to "443:80" if TLS is terminated upstream
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes: {}

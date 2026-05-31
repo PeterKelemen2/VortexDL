@@ -2,9 +2,11 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/utils/api'
 import { useAuthStore } from '@/stores/auth'
+import { useToast } from '@/composables/useToast'
 
 export const useJobsStore = defineStore('jobs', () => {
   const auth = useAuthStore()
+  const toast = useToast()
 
   const jobs = ref([])
   const total = ref(0)
@@ -28,6 +30,10 @@ export const useJobsStore = defineStore('jobs', () => {
 
   let eventSource = null
   let reconnectTimer = null
+  let reconnectAttempts = 0
+  // Reconnect backoff bounds (milliseconds).
+  const SSE_BASE_DELAY = 1000
+  const SSE_MAX_DELAY = 30000
 
   function _onRefresh(token) {
     auth.setAccessToken(token)
@@ -97,7 +103,9 @@ export const useJobsStore = defineStore('jobs', () => {
       job.result?.local_available &&
       previous?.status !== 'finished'
     ) {
-      downloadFile(job.id).catch(() => {})
+      downloadFile(job.id).catch(() => {
+        toast.error('Automatic download failed. Use the download button to retry.')
+      })
     }
   }
 
@@ -107,6 +115,8 @@ export const useJobsStore = defineStore('jobs', () => {
     eventSource = new EventSource(url)
     eventSource.addEventListener('open', () => {
       sseConnected.value = true
+      // Successful connection: reset the backoff window.
+      reconnectAttempts = 0
     })
     eventSource.addEventListener('job_update', (evt) => {
       try {
@@ -125,10 +135,18 @@ export const useJobsStore = defineStore('jobs', () => {
       // fresh reconnect that picks up the current access token.
       disconnectSSE()
       if (!reconnectTimer) {
+        // Exponential backoff with full jitter to avoid a reconnect stampede
+        // when the server restarts and many clients reconnect at once.
+        const exponential = Math.min(
+          SSE_MAX_DELAY,
+          SSE_BASE_DELAY * 2 ** reconnectAttempts,
+        )
+        const delay = Math.random() * exponential
+        reconnectAttempts += 1
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null
           connectSSE()
-        }, 5000)
+        }, delay)
       }
     })
   }

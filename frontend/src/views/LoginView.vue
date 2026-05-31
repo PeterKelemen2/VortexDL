@@ -28,11 +28,15 @@ async function getDeviceData() {
       const parts = [data.platform, data.platformVersion, data.model].filter(Boolean)
       if (parts.length) deviceName = parts.join(' ')
     } catch (error) {
-      console.debug('[auth] high-entropy hints unavailable', error)
+      if (import.meta.env.DEV) {
+        console.debug('[auth] high-entropy hints unavailable', error)
+      }
     }
   }
 
-  console.debug('[auth] device data', { deviceName, userAgent })
+  if (import.meta.env.DEV) {
+    console.debug('[auth] device data', { deviceName, userAgent })
+  }
   return { deviceName, userAgent }
 }
 

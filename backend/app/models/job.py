@@ -10,6 +10,7 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     DateTime,
+    Index,
     Enum as SAEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -83,3 +84,9 @@ class Job(Base):
     )
 
     user: Mapped["User"] = relationship("User")
+
+    __table_args__ = (
+        # Job listings filter by user and optionally by status; a composite
+        # index keeps those queries off a full table scan as the table grows.
+        Index("ix_jobs_user_id_status", "user_id", "status"),
+    )
