@@ -9,7 +9,9 @@ from app.models.role import Role
 from app.models.user import User
 from app.schemas.user import UserRead, UserListResponse, UserAdminUpdate, UserAdminDelete
 from app.schemas.role import RoleRead
+from app.schemas.audit_log import AuditLogListResponse, AuditLogRead
 from app.services.user_service import get_all_users, update_user_by_admin, delete_user_by_admin
+from app.services import audit_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -32,6 +34,26 @@ async def list_users(
     _: None = Depends(require_role("admin")),
 ):
     return await get_all_users(db, page, page_size)
+
+
+@router.get("/audit-logs", response_model=AuditLogListResponse)
+async def list_audit_logs(
+    db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    action: str | None = Query(None),
+    user_id: int | None = Query(None),
+    _: None = Depends(require_role("admin")),
+):
+    items, total = await audit_service.list_events(
+        db, page=page, page_size=page_size, action=action, user_id=user_id
+    )
+    return AuditLogListResponse(
+        items=[AuditLogRead.model_validate(i) for i in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/roles", response_model=List[RoleRead])

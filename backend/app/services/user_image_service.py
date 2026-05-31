@@ -16,10 +16,22 @@ ALLOWED_IMAGE_TYPES = {
     'image/webp': 'webp',
 }
 
+# Maps the format Pillow actually decodes from the bytes to a (mime, extension)
+# pair. Used instead of the spoofable client Content-Type header.
+_PIL_FORMAT_TO_TYPE = {
+    'JPEG': ('image/jpeg', 'jpg'),
+    'PNG': ('image/png', 'png'),
+    'WEBP': ('image/webp', 'webp'),
+}
+
 # Reject images that are excessively large in pixel dimensions to prevent
 # decompression bombs and excessive memory/CPU usage during variant generation.
 _MAX_IMAGE_PIXELS = 4000 * 4000  # 16 MP
 _MAX_IMAGE_DIMENSION = 8000      # px on any single side
+
+# Enforce the pixel cap inside Pillow itself so a decompression bomb is rejected
+# while decoding, before it can exhaust memory.
+Image.MAX_IMAGE_PIXELS = _MAX_IMAGE_PIXELS
 
 
 def _ensure_upload_dir() -> Path:
@@ -177,12 +189,20 @@ async def create_user_profile_image(current_user: User, upload_file: UploadFile,
     except Exception:
         raise HTTPException(status_code=400, detail="File is not a valid image.")
 
-    # Re-open after verify() (verify() exhausts the file handle) to check dimensions.
+    # Re-open after verify() (verify() exhausts the file handle) to check the
+    # decoded format and dimensions. The format is derived from the bytes, never
+    # from the client Content-Type header.
     try:
         with Image.open(io.BytesIO(file_bytes)) as img:
             width, height = img.size
+            detected_format = img.format
     except Exception:
         raise HTTPException(status_code=400, detail="File is not a valid image.")
+
+    type_info = _PIL_FORMAT_TO_TYPE.get(detected_format)
+    if type_info is None:
+        raise HTTPException(status_code=400, detail="Unsupported image type. Use JPG, PNG, or WEBP.")
+    mime_type, extension = type_info
 
     if width > _MAX_IMAGE_DIMENSION or height > _MAX_IMAGE_DIMENSION:
         raise HTTPException(
@@ -192,7 +212,6 @@ async def create_user_profile_image(current_user: User, upload_file: UploadFile,
     if width * height > _MAX_IMAGE_PIXELS:
         raise HTTPException(status_code=400, detail="Image resolution too large.")
 
-    extension = ALLOWED_IMAGE_TYPES[upload_file.content_type]
     filename = f"{uuid.uuid4().hex}.{extension}"
     root_dir = _ensure_upload_dir()
     user_dir = _get_user_image_upload_dir(current_user)
@@ -225,7 +244,7 @@ async def create_user_profile_image(current_user: User, upload_file: UploadFile,
         thumbnail_path=thumbnail_relative_path,
         preview_path=preview_relative_path,
         original_filename=safe_original_filename,
-        mime_type=upload_file.content_type,
+        mime_type=mime_type,
         is_active=False,
     )
     db.add(image_record)

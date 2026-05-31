@@ -1,10 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from datetime import datetime, timezone
 from app.models.user import User
 from app.models.role import Role
+from app.models.refresh_token import RefreshToken
 from app.schemas.user import UserRead, UserAdminUpdate, UserAdminDelete
 from app.services.auth_service import validate_password_strength, hash_password
 
@@ -62,6 +63,7 @@ async def update_user_by_admin(db: AsyncSession, user_id: int, user_update: User
         raise HTTPException(status_code=400, detail="Email confirmation does not match")
 
     changes_made = False
+    revoke_sessions = False
 
     if user_update.username is not None:
         new_username = user_update.username.strip()
@@ -85,6 +87,7 @@ async def update_user_by_admin(db: AsyncSession, user_id: int, user_update: User
                 raise HTTPException(status_code=400, detail="Invalid role")
             user.role_id = new_role.id
             changes_made = True
+            revoke_sessions = True
 
     if user_update.new_password is not None:
         if user_update.new_password != user_update.new_password_confirm:
@@ -92,9 +95,20 @@ async def update_user_by_admin(db: AsyncSession, user_id: int, user_update: User
         validate_password_strength(user_update.new_password)
         user.hashed_password = hash_password(user_update.new_password)
         changes_made = True
+        revoke_sessions = True
 
     if not changes_made:
         raise HTTPException(status_code=400, detail="No changes were provided")
+
+    # A role change makes cached JWT role claims stale and a forced password reset
+    # is typically a response to compromise; in both cases existing sessions must
+    # be invalidated so the user is forced to re-authenticate.
+    if revoke_sessions:
+        await db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.user_id == user.id, RefreshToken.revoked == False)
+            .values(revoked=True)
+        )
 
     user.updated_at = datetime.now(timezone.utc)
     await db.commit()

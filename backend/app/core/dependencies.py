@@ -1,5 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from fastapi import Header
 from jose import jwt, JWTError
 from datetime import datetime, timezone
 from app.core.config import settings
@@ -11,6 +12,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+# Optional scheme so endpoints can fall back to API-key auth when no bearer token.
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
@@ -65,3 +68,39 @@ def require_role(role_name: str):
         if current_user.role.name != role_name:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
     return role_dependency
+
+
+async def get_current_user_flexible(
+    token: str | None = Depends(oauth2_scheme_optional),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Authenticate via Bearer JWT or an ``X-API-Key`` header.
+
+    Bearer tokens take precedence; if absent, a valid API key is accepted.
+    """
+    if token:
+        return await get_current_user(token=token, db=db)
+
+    if x_api_key:
+        # Imported here to avoid a circular import at module load time.
+        from app.services.api_key_service import resolve_api_key
+
+        user = await resolve_api_key(x_api_key, db)
+        if user is not None:
+            # Eager-load the role for downstream authorization checks.
+            stmt = (
+                select(User)
+                .where(User.id == user.id)
+                .options(selectinload(User.role), selectinload(User.images))
+            )
+            full_user = (await db.execute(stmt)).scalar_one_or_none()
+            if full_user is not None:
+                setattr(full_user, "current_session_id", None)
+                return full_user
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )

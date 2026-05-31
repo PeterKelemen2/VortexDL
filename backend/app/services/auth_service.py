@@ -298,6 +298,7 @@ async def bootstrap_initial_admin(db: AsyncSession):
         email=email,
         hashed_password=hashed_pw,
         role_id=admin_role.id,
+        is_verified=True,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
@@ -343,6 +344,12 @@ async def register_user(user_in: UserRegister, db: AsyncSession):
     await db.commit()
     await db.refresh(user)
 
+    # Issue an email verification token + link. Imported locally to avoid a
+    # circular import (account_service depends on this module).
+    from app.services.account_service import issue_email_verification
+
+    await issue_email_verification(db, user)
+
     return UserRead(
         id=user.id,
         username=user.username,
@@ -366,6 +373,28 @@ async def refresh_tokens(
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
+        if settings.REQUIRE_EMAIL_VERIFICATION and not user.is_verified:
+            raise HTTPException(
+                status_code=403,
+                detail="Email not verified. Please check your inbox for the verification link.",
+            )
+
+        # Enforce two-factor authentication when enabled for this account.
+        if user.totp_enabled:
+            from app.services import totp_service
+
+            code = (data.totp_code or "").strip()
+            if not code:
+                raise HTTPException(status_code=401, detail="totp_required")
+            verified = totp_service.verify_code(user.totp_secret, code)
+            if not verified:
+                # Fall back to a single-use backup code.
+                updated = totp_service.consume_backup_code(user.totp_backup_codes, code)
+                if updated is None:
+                    raise HTTPException(status_code=401, detail="Invalid two-factor code")
+                user.totp_backup_codes = updated
+                await db.commit()
+
         resolved_name = await resolve_hostname(client_ip)
         logger.info(
             "User login successful",
@@ -384,6 +413,15 @@ async def refresh_tokens(
             resolved_name=resolved_name,
             device_os=device_os,
             user_agent=user_agent,
+        )
+        from app.services.audit_service import AuditAction, record_event
+
+        await record_event(
+            db,
+            action=AuditAction.LOGIN,
+            user_id=user.id,
+            username=user.username,
+            ip_address=client_ip,
         )
         return TokenResponse(access_token=access_token, refresh_token=refresh_token)
     elif isinstance(data, TokenRefreshRequest):

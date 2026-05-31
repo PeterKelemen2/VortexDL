@@ -8,10 +8,11 @@ import TextInput from '@/components/TextInput.vue'
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
-const form = ref({ username: '', password: '' })
+const form = ref({ username: '', password: '', totpCode: '' })
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
+const totpRequired = ref(false)
 
 async function getDeviceData() {
   const userAgent = navigator.userAgent || undefined
@@ -46,12 +47,19 @@ async function onLogin() {
       form.value.password,
       deviceData.deviceName,
       deviceData.userAgent,
+      totpRequired.value ? form.value.totpCode : null,
     )
     success.value = 'Login successful! Redirecting...'
     await new Promise((resolve) => setTimeout(resolve, 1000))
     await router.push(route.query.redirect || '/')
   } catch (e) {
-    error.value = e.message
+    if (e.status === 401 && e.message === 'totp_required') {
+      totpRequired.value = true
+      error.value = 'Enter the code from your authenticator app.'
+    } else {
+      if (e.message === 'totp_required') error.value = 'Two-factor code required.'
+      else error.value = e.message
+    }
   } finally {
     loading.value = false
   }
@@ -72,11 +80,25 @@ async function onLogin() {
           autocomplete="current-password"
           required
         />
+        <TextInput
+          v-if="totpRequired"
+          v-model="form.totpCode"
+          label="Two-factor code"
+          autocomplete="one-time-code"
+          inputmode="numeric"
+          placeholder="123456 or backup code"
+          required
+        />
         <button type="submit" :disabled="loading" class="btn w-full">
           {{ loading ? 'Logging in...' : 'Login' }}
         </button>
         <div v-if="error" class="text-red-600 text-center font-medium">{{ error }}</div>
         <div v-if="success" class="text-green-600 text-center font-medium">{{ success }}</div>
+        <div class="text-center mt-2">
+          <router-link to="/forgot-password" class="text-blue-600 hover:underline"
+            >Forgot your password?</router-link
+          >
+        </div>
         <div class="text-center mt-2">
           <router-link to="/register" class="text-blue-600 hover:underline"
             >Don't have an account? Register</router-link

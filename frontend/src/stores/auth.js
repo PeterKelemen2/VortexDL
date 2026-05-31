@@ -66,10 +66,11 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function login(username, password, deviceName = null, userAgent = null) {
+  async function login(username, password, deviceName = null, userAgent = null, totpCode = null) {
     const payload = { username, password }
     if (deviceName) payload.device_name = deviceName
     if (userAgent) payload.user_agent = userAgent
+    if (totpCode) payload.totp_code = totpCode
 
     console.debug('[auth] login payload', { username, deviceName, userAgent })
     const tokens = await api.login(payload)

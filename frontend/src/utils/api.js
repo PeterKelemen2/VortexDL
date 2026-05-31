@@ -73,6 +73,34 @@ async function request(path, { method = 'GET', body, headers = {}, token } = {})
   return data
 }
 
+async function requestBlobWithAuth(path, { token, onTokenRefresh } = {}) {
+  const doFetch = async (authToken) =>
+    fetch(`${BACKEND_URL}${path}`, {
+      method: 'GET',
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      credentials: 'include',
+    })
+
+  let res = await doFetch(token)
+  if (res.status === 401) {
+    const refreshResponse = await refresh()
+    if (refreshResponse?.access_token) {
+      if (typeof onTokenRefresh === 'function') onTokenRefresh(refreshResponse.access_token)
+      res = await doFetch(refreshResponse.access_token)
+    }
+  }
+  if (!res.ok) {
+    const error = new Error('Download failed')
+    error.status = res.status
+    throw error
+  }
+  const disposition = res.headers.get('Content-Disposition') || ''
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)
+  const filename = match ? decodeURIComponent(match[1]) : 'download'
+  const blob = await res.blob()
+  return { blob, filename }
+}
+
 async function requestWithAuth(path, { method = 'GET', body, headers = {}, token, onTokenRefresh } = {}) {
   const combinedHeaders = { ...headers, ...getCsrfHeader() }
   try {
@@ -102,6 +130,33 @@ const api = {
   refresh: () => request('/auth/refresh', { method: 'POST', headers: getCsrfHeader() }),
   logout: () => request('/auth/logout', { method: 'POST', headers: getCsrfHeader() }),
 
+  requestEmailVerification: (email) =>
+    request('/auth/verify-email/request', { method: 'POST', body: { email } }),
+  verifyEmail: (token) => request('/auth/verify-email', { method: 'POST', body: { token } }),
+  requestPasswordReset: (email) =>
+    request('/auth/password-reset/request', { method: 'POST', body: { email } }),
+  resetPassword: (payload) => request('/auth/password-reset', { method: 'POST', body: payload }),
+
+  // --- Two-factor authentication ---
+  getTwoFactorStatus: (token, onTokenRefresh) =>
+    requestWithAuth('/auth/2fa/status', { token, onTokenRefresh }),
+  setupTwoFactor: (token, onTokenRefresh) =>
+    requestWithAuth('/auth/2fa/setup', { method: 'POST', token, onTokenRefresh }),
+  verifyTwoFactor: (code, token, onTokenRefresh) =>
+    requestWithAuth('/auth/2fa/verify', { method: 'POST', body: { code }, token, onTokenRefresh }),
+  disableTwoFactor: (password, token, onTokenRefresh) =>
+    requestWithAuth('/auth/2fa/disable', { method: 'POST', body: { password }, token, onTokenRefresh }),
+  regenerateBackupCodes: (code, token, onTokenRefresh) =>
+    requestWithAuth('/auth/2fa/backup-codes', { method: 'POST', body: { code }, token, onTokenRefresh }),
+
+  // --- API keys ---
+  listApiKeys: (token, onTokenRefresh) =>
+    requestWithAuth('/api-keys', { token, onTokenRefresh }),
+  createApiKey: (payload, token, onTokenRefresh) =>
+    requestWithAuth('/api-keys', { method: 'POST', body: payload, token, onTokenRefresh }),
+  revokeApiKey: (keyId, token, onTokenRefresh) =>
+    requestWithAuth(`/api-keys/${keyId}`, { method: 'DELETE', token, onTokenRefresh }),
+
   getCurrentUser: (token, onTokenRefresh) => requestWithAuth('/auth/me', { token, onTokenRefresh }),
   getSessions: (token, onTokenRefresh) => requestWithAuth('/auth/sessions', { token, onTokenRefresh }),
   revokeSession: (sessionId, token, onTokenRefresh) => requestWithAuth(`/auth/sessions/${sessionId}`, {
@@ -130,6 +185,12 @@ const api = {
     { token, onTokenRefresh },
   ),
   getAdminRoles: (token, onTokenRefresh) => requestWithAuth('/admin/roles', { token, onTokenRefresh }),
+  listAuditLogs: ({ page = 1, pageSize = 50, action = '', userId = null } = {}, token, onTokenRefresh) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (action) params.set('action', action)
+    if (userId != null && userId !== '') params.set('user_id', String(userId))
+    return requestWithAuth(`/admin/audit-logs?${params.toString()}`, { token, onTokenRefresh })
+  },
   updateUserByAdmin: (userId, payload, token, onTokenRefresh) => requestWithAuth(`/admin/users/${userId}`, {
     method: 'PATCH',
     body: payload,
@@ -163,6 +224,80 @@ const api = {
     token,
     onTokenRefresh,
   }),
+
+  // --- Downloads / jobs ---
+  createDownloadJob: (payload, token, onTokenRefresh) =>
+    requestWithAuth('/jobs/downloads', { method: 'POST', body: payload, token, onTokenRefresh }),
+  listJobs: ({ page = 1, pageSize = 20, status = null } = {}, token, onTokenRefresh) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (status) params.set('status', status)
+    return requestWithAuth(`/jobs?${params.toString()}`, { token, onTokenRefresh })
+  },
+  getJob: (jobId, token, onTokenRefresh) =>
+    requestWithAuth(`/jobs/${jobId}`, { token, onTokenRefresh }),
+  cancelJob: (jobId, token, onTokenRefresh) =>
+    requestWithAuth(`/jobs/${jobId}/cancel`, { method: 'POST', token, onTokenRefresh }),
+  retryJob: (jobId, token, onTokenRefresh) =>
+    requestWithAuth(`/jobs/${jobId}/retry`, { method: 'POST', token, onTokenRefresh }),
+  downloadJobFile: (jobId, token, onTokenRefresh) =>
+    requestBlobWithAuth(`/jobs/${jobId}/download`, { token, onTokenRefresh }),
+  jobStreamUrl: (token) => `${BACKEND_URL}/jobs/stream?token=${encodeURIComponent(token)}`,
+
+  // --- Remote machines (user) ---
+  listMyRemoteMachines: (token, onTokenRefresh) =>
+    requestWithAuth('/remote-machines', { token, onTokenRefresh }),
+  browseRemoteFolder: (machineId, path, token, onTokenRefresh) => {
+    const params = new URLSearchParams()
+    if (path) params.set('path', path)
+    const qs = params.toString()
+    return requestWithAuth(
+      `/remote-machines/${machineId}/browse${qs ? `?${qs}` : ''}`,
+      { token, onTokenRefresh },
+    )
+  },
+
+  // --- Remote machines (admin) ---
+  adminListRemoteMachines: ({ page = 1, pageSize = 20 } = {}, token, onTokenRefresh) =>
+    requestWithAuth(
+      `/admin/remote-machines?page=${page}&page_size=${pageSize}`,
+      { token, onTokenRefresh },
+    ),
+  adminCreateRemoteMachine: (payload, token, onTokenRefresh) =>
+    requestWithAuth('/admin/remote-machines', { method: 'POST', body: payload, token, onTokenRefresh }),
+  adminUpdateRemoteMachine: (machineId, payload, token, onTokenRefresh) =>
+    requestWithAuth(`/admin/remote-machines/${machineId}`, {
+      method: 'PATCH',
+      body: payload,
+      token,
+      onTokenRefresh,
+    }),
+  adminDeleteRemoteMachine: (machineId, token, onTokenRefresh) =>
+    requestWithAuth(`/admin/remote-machines/${machineId}`, {
+      method: 'DELETE',
+      token,
+      onTokenRefresh,
+    }),
+  adminTestRemoteMachine: (machineId, token, onTokenRefresh) =>
+    requestWithAuth(`/admin/remote-machines/${machineId}/test`, {
+      method: 'POST',
+      token,
+      onTokenRefresh,
+    }),
+  adminListMachineUsers: (machineId, token, onTokenRefresh) =>
+    requestWithAuth(`/admin/remote-machines/${machineId}/users`, { token, onTokenRefresh }),
+  adminAssignUser: (machineId, userId, token, onTokenRefresh) =>
+    requestWithAuth(`/admin/remote-machines/${machineId}/users`, {
+      method: 'POST',
+      body: { user_id: userId },
+      token,
+      onTokenRefresh,
+    }),
+  adminUnassignUser: (machineId, userId, token, onTokenRefresh) =>
+    requestWithAuth(`/admin/remote-machines/${machineId}/users/${userId}`, {
+      method: 'DELETE',
+      token,
+      onTokenRefresh,
+    }),
 }
 
 export { hasSessionCookies, api }
