@@ -240,6 +240,14 @@ async def download_handler(ctx: JobContext) -> dict:
         await ctx.update_progress(70)
         remote_info = await _deliver_remote(ctx.payload, Path(filepath))
         result.update(remote_info)
+        # For remote-only jobs the local copy is just a staging artifact — remove
+        # it now that the file has been transferred to the remote machine.
+        if destination == "remote":
+            try:
+                Path(filepath).unlink(missing_ok=True)
+            except OSError as exc:
+                logger.warning("Could not remove local staging file %s: %s", filepath, exc)
+            result.pop("filepath", None)
 
     result["destination_type"] = destination
     result["local_available"] = destination in ("local", "both")

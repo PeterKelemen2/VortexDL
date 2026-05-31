@@ -13,6 +13,7 @@ const url = ref('')
 const submitting = ref(false)
 
 const PARAMS_KEY = 'dl_params'
+const DESTINATION_KEY = 'dl_destination'
 
 const defaultParams = () => ({
   quality: 'best',
@@ -41,14 +42,36 @@ function loadParams() {
   return defaultParams()
 }
 
+function loadDestination() {
+  try {
+    const saved = localStorage.getItem(DESTINATION_KEY)
+    if (saved) return { ...defaultDestination(), ...JSON.parse(saved) }
+  } catch {
+    // ignore corrupt storage
+  }
+  return defaultDestination()
+}
+
 const params = reactive(loadParams())
-const destination = reactive(defaultDestination())
+const destination = reactive(loadDestination())
 
 watch(
   params,
   (val) => {
     try {
       localStorage.setItem(PARAMS_KEY, JSON.stringify({ ...val }))
+    } catch {
+      // storage full or unavailable
+    }
+  },
+  { deep: true },
+)
+
+watch(
+  destination,
+  (val) => {
+    try {
+      localStorage.setItem(DESTINATION_KEY, JSON.stringify({ ...val }))
     } catch {
       // storage full or unavailable
     }

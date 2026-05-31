@@ -41,6 +41,10 @@ export default defineConfig(({ mode }) => {
           target: BACKEND_PROXY_TARGET,
           changeOrigin: true,
         },
+        '/remote-machines': {
+          target: BACKEND_PROXY_TARGET,
+          changeOrigin: true,
+        },
       },
     },
   }
