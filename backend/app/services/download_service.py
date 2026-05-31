@@ -46,6 +46,7 @@ def _build_ydl_opts(payload: dict, dest: Path) -> dict:
         "noplaylist": not bool(payload.get("allow_playlist", False)),
         "quiet": True,
         "no_warnings": True,
+        "no_overwrites": True,
         "postprocessors": [],
     }
 
@@ -86,6 +87,19 @@ def _build_ydl_opts(payload: dict, dest: Path) -> dict:
         ydl_opts["postprocessors"].append({"key": "EmbedThumbnail", "already_have_thumbnail": False})
 
     return ydl_opts
+
+
+def _unique_path(path: Path) -> Path:
+    """Return a non-colliding path by appending _1, _2, … to the stem."""
+    if not path.exists():
+        return path
+    stem, suffix, parent = path.stem, path.suffix, path.parent
+    i = 1
+    while True:
+        candidate = parent / f"{stem}_{i}{suffix}"
+        if not candidate.exists():
+            return candidate
+        i += 1
 
 
 def _run_yt_dlp(payload: dict, dest: Path, progress_cb=None) -> dict:
@@ -131,6 +145,13 @@ def _run_yt_dlp(payload: dict, dest: Path, progress_cb=None) -> dict:
                 filepath = requested[0]["filepath"]
             else:
                 filepath = ydl.prepare_filename(entry) if entry else None
+
+        # Rename to avoid collisions with previously downloaded files.
+        if filepath:
+            final_path = _unique_path(Path(filepath))
+            if final_path != Path(filepath) and Path(filepath).exists():
+                Path(filepath).rename(final_path)
+                filepath = str(final_path)
     except DownloadError as exc:
         raise RuntimeError("Download failed. The URL may be unavailable or restricted.") from exc
 
@@ -141,6 +162,7 @@ def _run_yt_dlp(payload: dict, dest: Path, progress_cb=None) -> dict:
         "duration": (entry or {}).get("duration"),
         "uploader": (entry or {}).get("uploader"),
         "webpage_url": (entry or {}).get("webpage_url", url),
+        "thumbnail": (entry or {}).get("thumbnail"),
         "filepath": filepath,
     }
 
