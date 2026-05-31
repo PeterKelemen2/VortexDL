@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -9,6 +10,11 @@ from slowapi import _rate_limit_exceeded_handler
 from app.api.routes import health, auth, admin, jobs, api_keys
 from app.core.config import settings
 from app.core.db import async_session
+
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL, logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 from app.core.rate_limit import limiter
 from app.core.job_queue import job_queue
 from app.services.auth_service import bootstrap_initial_admin

@@ -122,7 +122,7 @@ def _require_csrf(request: Request) -> None:
 
 @router.post("/register", response_model=UserRead)
 @limiter.limit(settings.RATE_LIMIT_REGISTER)
-async def register(user_in: UserRegister, request: Request, db: AsyncSession = Depends(get_db)):
+async def register(user_in: UserRegister, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     return await register_user(user_in, db)
 
 
@@ -203,6 +203,7 @@ async def logout(
 async def request_verification(
     payload: EmailVerificationRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     return await request_email_verification(payload, db)
@@ -213,6 +214,7 @@ async def request_verification(
 async def confirm_verification(
     payload: EmailVerificationConfirm,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     return await verify_email(payload, db)
@@ -223,6 +225,7 @@ async def confirm_verification(
 async def request_reset(
     payload: PasswordResetRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     return await request_password_reset(payload, db)
@@ -233,6 +236,7 @@ async def request_reset(
 async def confirm_reset(
     payload: PasswordResetConfirm,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     return await reset_password(payload, db)

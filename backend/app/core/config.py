@@ -66,6 +66,9 @@ class Settings:
     RATE_LIMIT_PASSWORD_RESET = os.getenv("RATE_LIMIT_PASSWORD_RESET", "5/hour")
     RATE_LIMIT_EMAIL_VERIFICATION = os.getenv("RATE_LIMIT_EMAIL_VERIFICATION", "5/hour")
 
+    # --- Logging --------------------------------------------------------------
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
     # --- Background job queue --------------------------------------------------
     # Number of concurrent in-process worker tasks pulling from the job queue.
     JOB_WORKER_CONCURRENCY = int(os.getenv("JOB_WORKER_CONCURRENCY", "2"))
