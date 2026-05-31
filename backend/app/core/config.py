@@ -27,7 +27,7 @@ def _read_version() -> str:
 
 
 class Settings:
-    APP_NAME = os.getenv("APP_NAME", "Downloader API")
+    APP_NAME = os.getenv("APP_NAME", "VortexDL API")
     APP_VERSION: str = _read_version()
     DEBUG = os.getenv("DEBUG", "false") == "true"
     SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite+aiosqlite:////app/data/app.db")
