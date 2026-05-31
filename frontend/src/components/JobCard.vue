@@ -102,11 +102,46 @@ async function download() {
   <div
     class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4"
   >
-    <div class="flex items-start justify-between gap-3">
-      <div class="min-w-0">
-        <p class="font-medium text-slate-900 dark:text-slate-100 truncate" :title="title">
-          {{ title }}
-        </p>
+    <div class="flex items-start gap-3">
+      <!-- Thumbnail -->
+      <div class="shrink-0 w-16 h-12 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+        <img
+          v-if="job.result?.thumbnail"
+          :src="job.result.thumbnail"
+          :alt="title"
+          class="w-full h-full object-cover"
+          loading="lazy"
+        />
+        <component v-else :is="statusMeta.icon" class="w-5 h-5 text-slate-400" :class="statusMeta.spin ? 'animate-spin' : ''" />
+      </div>
+
+      <div class="flex-1 min-w-0">
+        <div class="flex items-start justify-between gap-2">
+          <p class="font-medium text-slate-900 dark:text-slate-100 truncate" :title="title">
+            {{ title }}
+          </p>
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              v-if="canDownload"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-sm font-medium"
+              @click="download"
+            >
+              <Download class="w-4 h-4" />
+              Download
+            </button>
+            <button
+              v-if="isActive"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+              @click="cancel"
+            >
+              <X class="w-4 h-4" />
+              Cancel
+            </button>
+          </div>
+        </div>
+
         <div class="flex items-center gap-2 mt-1">
           <span
             :class="[
@@ -125,47 +160,26 @@ async function download() {
             <Monitor class="w-3 h-3" /> remote
           </span>
         </div>
-      </div>
 
-      <div class="flex items-center gap-2 shrink-0">
-        <button
-          v-if="canDownload"
-          type="button"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-sm font-medium"
-          @click="download"
+        <div v-if="isActive" class="mt-2">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs text-slate-400">{{ job.progress || 0 }}%</span>
+          </div>
+          <div class="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+            <div
+              class="h-full rounded-full bg-blue-500 transition-all duration-300"
+              :style="{ width: `${job.progress || 0}%` }"
+            />
+          </div>
+        </div>
+
+        <p
+          v-if="job.status === 'failed' && job.error"
+          class="mt-2 text-xs text-red-600 dark:text-red-400 wrap-break-word"
         >
-          <Download class="w-4 h-4" />
-          Download
-        </button>
-        <button
-          v-if="isActive"
-          type="button"
-          class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
-          @click="cancel"
-        >
-          <X class="w-4 h-4" />
-          Cancel
-        </button>
+          {{ job.error }}
+        </p>
       </div>
     </div>
-
-    <div v-if="isActive" class="mt-3">
-      <div class="flex items-center justify-between mb-1">
-        <span class="text-xs text-slate-400">{{ job.progress || 0 }}%</span>
-      </div>
-      <div class="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-        <div
-          class="h-full rounded-full bg-blue-500 transition-all duration-300"
-          :style="{ width: `${job.progress || 0}%` }"
-        />
-      </div>
-    </div>
-
-    <p
-      v-if="job.status === 'failed' && job.error"
-      class="mt-2 text-xs text-red-600 dark:text-red-400 wrap-break-word"
-    >
-      {{ job.error }}
-    </p>
   </div>
 </template>
