@@ -1,6 +1,6 @@
 import asyncio
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 async def enqueue_download(
     data: DownloadJobCreate,
     request: Request,
+    response: Response,
     current_user: User = Depends(get_current_user_flexible),
     db: AsyncSession = Depends(get_db),
 ) -> JobRead:
