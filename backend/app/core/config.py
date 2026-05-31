@@ -100,6 +100,7 @@ class Settings:
     RATE_LIMIT_REFRESH = os.getenv("RATE_LIMIT_REFRESH", "30/minute")
     RATE_LIMIT_PASSWORD_RESET = os.getenv("RATE_LIMIT_PASSWORD_RESET", "5/hour")
     RATE_LIMIT_EMAIL_VERIFICATION = os.getenv("RATE_LIMIT_EMAIL_VERIFICATION", "5/hour")
+    RATE_LIMIT_DOWNLOAD = os.getenv("RATE_LIMIT_DOWNLOAD", "20/minute")
 
     # --- Logging --------------------------------------------------------------
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -119,6 +120,11 @@ class Settings:
     REMOTE_SECRET_KEY = os.getenv("REMOTE_SECRET_KEY") or JWT_SECRET
     # Seconds an idle pooled SSH connection is kept alive before being recycled.
     SSH_CONNECT_TIMEOUT = int(os.getenv("SSH_CONNECT_TIMEOUT", "15"))
+    # Directory that SSH private-key files must reside in. Operator-supplied
+    # ssh_key_path values are confined to this directory (after resolving
+    # symlinks/.. segments) so a malicious admin cannot point the SSH client at
+    # arbitrary files such as /etc/shadow or other users' keys.
+    SSH_KEY_ALLOWED_DIR = os.getenv("SSH_KEY_ALLOWED_DIR", "/app/ssh_keys")
     # Maximum number of entries returned by a single remote folder browse call.
     REMOTE_BROWSE_MAX_ENTRIES = int(os.getenv("REMOTE_BROWSE_MAX_ENTRIES", "1000"))
 

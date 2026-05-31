@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import posixpath
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.ssh_crypto import encrypt_secret
 from app.core.ssh_pool import HostKeyMismatchError, ssh_pool
 from app.models.remote_machine import RemoteMachine, SSHAuthType
@@ -24,6 +26,29 @@ from app.schemas.remote_machine import (
 
 
 # --- CRUD ---------------------------------------------------------------------
+
+
+def _validate_ssh_key_path(ssh_key_path: str) -> str:
+    """Confine an operator-supplied SSH key path to ``SSH_KEY_ALLOWED_DIR``.
+
+    Resolves symlinks and ``..`` segments before checking containment so the
+    SSH client can never be pointed at arbitrary files (e.g. ``/etc/shadow``).
+    Returns the normalised absolute path.
+    """
+    allowed_root = Path(settings.SSH_KEY_ALLOWED_DIR).resolve()
+    candidate = Path(ssh_key_path)
+    if not candidate.is_absolute():
+        candidate = allowed_root / candidate
+    resolved = candidate.resolve()
+    if resolved != allowed_root and allowed_root not in resolved.parents:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "ssh_key_path must be located within the configured SSH key "
+                f"directory ({settings.SSH_KEY_ALLOWED_DIR})"
+            ),
+        )
+    return str(resolved)
 
 
 async def create_machine(data: RemoteMachineCreate, db: AsyncSession) -> RemoteMachine:
@@ -50,7 +75,9 @@ async def create_machine(data: RemoteMachineCreate, db: AsyncSession) -> RemoteM
             else None
         ),
         ssh_key_path=(
-            data.ssh_key_path if data.auth_type == SSHAuthType.key else None
+            _validate_ssh_key_path(data.ssh_key_path)
+            if data.auth_type == SSHAuthType.key and data.ssh_key_path
+            else None
         ),
     )
     db.add(machine)
@@ -124,7 +151,7 @@ async def update_machine(
         machine.ssh_key_path = None
     else:
         if data.ssh_key_path is not None:
-            machine.ssh_key_path = data.ssh_key_path
+            machine.ssh_key_path = _validate_ssh_key_path(data.ssh_key_path)
         machine.encrypted_password = None
 
     # Connection parameters may have changed; drop any pooled connection and

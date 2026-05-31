@@ -15,7 +15,7 @@ from app.models.job import Job, JobStatus
 from app.models.remote_machine import RemoteMachine
 from app.models.user_remote_machine import UserRemoteMachine
 from app.schemas.job import DownloadDestination, DownloadJobCreate, JobRead
-from app.services.download_service import DOWNLOAD_JOB_TYPE
+from app.services.download_service import DOWNLOAD_JOB_TYPE, _safe_remote_path
 
 # Extensions that are safe to expose in a Content-Disposition filename. Anything
 # else (e.g. a tampered DB record pointing at an executable) is downgraded to
@@ -76,8 +76,20 @@ async def create_download_job(
         DownloadDestination.remote,
         DownloadDestination.both,
     ):
-        await _assert_machine_access(user_id, data.remote_machine_id, db)
+        machine = await _assert_machine_access(user_id, data.remote_machine_id, db)
         remote_machine_id = data.remote_machine_id
+        # Validate the subfolder against the machine's download root now, so an
+        # invalid path is rejected before the job is queued rather than only at
+        # delivery time (defense in depth: validated again in _deliver_remote).
+        if data.remote_subfolder:
+            try:
+                _safe_remote_path(
+                    machine.download_folder, data.remote_subfolder, "placeholder"
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+                ) from exc
 
     payload = {
         "url": data.url,

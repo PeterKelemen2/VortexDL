@@ -4,7 +4,7 @@ import enum
 from datetime import datetime
 from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.job import JobStatus
 
@@ -44,7 +44,7 @@ class DownloadJobCreate(BaseModel):
 
     url: Annotated[str, Field(min_length=1, max_length=2048)]
 
-    # --- yt-dlp parameters ----------------------------------------------------
+    # --- yt-dlp parameters ---
     quality: DownloadQuality = DownloadQuality.best
     audio_format: AudioFormat = AudioFormat.mp3
     container: ContainerFormat = ContainerFormat.auto
@@ -59,6 +59,15 @@ class DownloadJobCreate(BaseModel):
     remote_machine_id: int | None = None
     # Relative subfolder within the machine's configured download folder.
     remote_subfolder: str | None = Field(default=None, max_length=1024)
+
+    @field_validator("url")
+    @classmethod
+    def _validate_url_scheme(cls, value: str) -> str:
+        candidate = value.strip()
+        lowered = candidate.lower()
+        if not (lowered.startswith("http://") or lowered.startswith("https://")):
+            raise ValueError("Only http:// and https:// URLs are supported")
+        return candidate
 
     @model_validator(mode="after")
     def _validate_remote(self) -> "DownloadJobCreate":

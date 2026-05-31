@@ -51,7 +51,7 @@ async function request(path, { method = 'GET', body, headers = {}, token } = {})
   if (token) opts.headers['Authorization'] = `Bearer ${token}`
 
   const sanitizedBody = body ? sanitizeBody(body) : null
-  console.debug('[api] request', { path, method, body: sanitizedBody, token: !!token })
+  // console.debug('[api] request', { path, method, body: sanitizedBody, token: !!token })
 
   const res = await fetch(`${BACKEND_URL}${path}`, opts)
   let data = null
@@ -61,10 +61,12 @@ async function request(path, { method = 'GET', body, headers = {}, token } = {})
     data = null
   }
 
-  console.debug('[api] response', { path, status: res.status, ok: res.ok, data })
+  // console.debug('[api] response', { path, status: res.status, ok: res.ok, data })
 
   if (!res.ok) {
-    console.error('[api] error', { path, status: res.status, data })
+    if (import.meta.env.DEV) {
+      console.error('[api] error', { path, status: res.status, data })
+    }
     const error = new Error(data?.detail || 'API error')
     error.status = res.status
     throw error

@@ -5,6 +5,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, get_current_user_flexible, get_db
+from app.core.rate_limit import limiter
+from app.core.config import settings
 from app.core.sse_bus import sse_bus
 from app.models.job import JobStatus
 from app.models.user import User
@@ -19,8 +21,10 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.post("/downloads", response_model=JobRead, status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(settings.RATE_LIMIT_DOWNLOAD)
 async def enqueue_download(
     data: DownloadJobCreate,
+    request: Request,
     current_user: User = Depends(get_current_user_flexible),
     db: AsyncSession = Depends(get_db),
 ) -> JobRead:

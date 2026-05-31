@@ -25,7 +25,7 @@ def test_settings_raises_when_jwt_secret_is_missing(monkeypatch):
 
 
 def test_settings_normalizes_invalid_cookie_samesite_to_lax(monkeypatch):
-    monkeypatch.setenv("JWT_SECRET", "test-secret")
+    monkeypatch.setenv("JWT_SECRET", "test-secret-that-is-at-least-32-chars!")
     monkeypatch.setenv("COOKIE_SAMESITE", "invalid-value")
     monkeypatch.setenv("SQLALCHEMY_DATABASE_URI", "sqlite+aiosqlite:///:memory:")
     monkeypatch.setenv("CORS_ORIGINS", "http://localhost")

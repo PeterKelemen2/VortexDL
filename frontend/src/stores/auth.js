@@ -72,7 +72,9 @@ export const useAuthStore = defineStore('auth', () => {
     if (userAgent) payload.user_agent = userAgent
     if (totpCode) payload.totp_code = totpCode
 
-    console.debug('[auth] login payload', { username, deviceName, userAgent })
+    if (import.meta.env.DEV) {
+      console.debug('[auth] login payload', { username, deviceName, userAgent })
+    }
     const tokens = await api.login(payload)
     setAccessToken(tokens.access_token)
     user.value = await api.getCurrentUser(tokens.access_token, setAccessToken)

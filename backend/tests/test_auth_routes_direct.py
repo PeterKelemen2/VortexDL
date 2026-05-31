@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import text
+from sqlalchemy import text, update
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -93,6 +93,14 @@ async def test_refresh_route_direct_rotates_refresh_cookie():
         await session.refresh(user)
 
         _, raw_refresh = await create_tokens(session, user)
+        # Force the token to be near-expiry so rotation is triggered
+        token_hash_val = hash_token(raw_refresh)
+        await session.execute(
+            update(RefreshToken)
+            .where(RefreshToken.token_hash == token_hash_val)
+            .values(expires_at=datetime.now(timezone.utc) + timedelta(hours=12))
+        )
+        await session.commit()
         csrf_token = "direct-csrf-token"
         request = build_request(
             headers={"user-agent": "test-agent", "x-csrf-token": csrf_token},
