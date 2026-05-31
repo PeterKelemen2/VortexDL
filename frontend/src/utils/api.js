@@ -237,6 +237,8 @@ const api = {
     requestWithAuth(`/jobs/${jobId}`, { token, onTokenRefresh }),
   cancelJob: (jobId, token, onTokenRefresh) =>
     requestWithAuth(`/jobs/${jobId}/cancel`, { method: 'POST', token, onTokenRefresh }),
+  retryJob: (jobId, token, onTokenRefresh) =>
+    requestWithAuth(`/jobs/${jobId}/retry`, { method: 'POST', token, onTokenRefresh }),
   downloadJobFile: (jobId, token, onTokenRefresh) =>
     requestBlobWithAuth(`/jobs/${jobId}/download`, { token, onTokenRefresh }),
   jobStreamUrl: (token) => `${BACKEND_URL}/jobs/stream?token=${encodeURIComponent(token)}`,

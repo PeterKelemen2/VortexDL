@@ -53,11 +53,33 @@ async def stream_job_events(
                     break
                 if shutdown_event and shutdown_event.is_set():
                     break
-                try:
-                    payload = await asyncio.wait_for(queue.get(), timeout=25.0)
-                    yield f"event: job_update\ndata: {payload}\n\n"
-                except asyncio.TimeoutError:
-                    # Keep-alive comment to hold the connection open.
+
+                # Race the next event against disconnection / shutdown so we
+                # never block the server from reloading/stopping for long.
+                get_task = asyncio.ensure_future(queue.get())
+                shutdown_task = asyncio.ensure_future(
+                    shutdown_event.wait() if shutdown_event else asyncio.sleep(25.0)
+                )
+                done, pending = await asyncio.wait(
+                    {get_task, shutdown_task},
+                    timeout=25.0,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for t in pending:
+                    t.cancel()
+
+                if shutdown_task in done or (shutdown_event and shutdown_event.is_set()):
+                    break
+                if await request.is_disconnected():
+                    break
+                if get_task in done:
+                    try:
+                        payload = get_task.result()
+                        yield f"event: job_update\ndata: {payload}\n\n"
+                    except Exception:
+                        pass
+                else:
+                    # Both timed out — send keep-alive
                     yield ": keep-alive\n\n"
         finally:
             await sse_bus.unsubscribe(current_user.id, queue)
@@ -122,3 +144,12 @@ async def cancel_my_job(
     db: AsyncSession = Depends(get_db),
 ) -> JobRead:
     return await job_service.cancel_job(job_id, current_user.id, db)
+
+
+@router.post("/{job_id}/retry", response_model=JobRead)
+async def retry_my_job(
+    job_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JobRead:
+    return await job_service.retry_job(job_id, current_user.id, db)

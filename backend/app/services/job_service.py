@@ -162,7 +162,17 @@ async def get_job_file(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="File no longer exists"
         )
-    return path, path.name
+    # Build a clean download filename from the reported title so the browser
+    # never sees any _1/_2 deduplication suffix added on the backend.
+    title = result.get("title", "").strip()
+    ext = path.suffix  # includes the leading dot, e.g. ".mp3"
+    if title and ext:
+        # Strip characters that are unsafe in Content-Disposition filenames.
+        safe_title = "".join(c if c not in r'\/:*?"<>|' else "_" for c in title)
+        download_name = f"{safe_title}{ext}"
+    else:
+        download_name = path.name
+    return path, download_name
 
 
 async def cancel_job(job_id: int, user_id: int, db: AsyncSession) -> JobRead:
@@ -181,3 +191,26 @@ async def cancel_job(job_id: int, user_id: int, db: AsyncSession) -> JobRead:
     await db.commit()
     await db.refresh(job)
     return _to_read(job)
+
+
+async def retry_job(job_id: int, user_id: int, db: AsyncSession) -> JobRead:
+    """Re-queue a failed or canceled job using its original payload."""
+    job = await db.get(Job, job_id)
+    if job is None or job.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    if JobStatus(job.status) not in (JobStatus.failed, JobStatus.canceled):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only failed or canceled jobs can be retried",
+        )
+    job.status = JobStatus.queued
+    job.error = None
+    job.result = None
+    job.progress = 0
+    job.started_at = None
+    job.finished_at = None
+    await db.commit()
+    await db.refresh(job)
+    await job_queue.enqueue(job.id)
+    return _to_read(job)
+

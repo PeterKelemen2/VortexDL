@@ -64,6 +64,12 @@ export const useJobsStore = defineStore('jobs', () => {
     return updated
   }
 
+  async function retryJob(jobId) {
+    const updated = await api.retryJob(jobId, auth.accessToken, _onRefresh)
+    _mergeJob(updated)
+    return updated
+  }
+
   async function downloadFile(jobId) {
     const { blob, filename } = await api.downloadJobFile(jobId, auth.accessToken, _onRefresh)
     const url = URL.createObjectURL(blob)
@@ -158,6 +164,7 @@ export const useJobsStore = defineStore('jobs', () => {
     fetchJobs,
     startDownload,
     cancelJob,
+    retryJob,
     downloadFile,
     connectSSE,
     disconnectSSE,

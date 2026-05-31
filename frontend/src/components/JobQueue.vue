@@ -24,8 +24,8 @@ function next() {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="flex items-center justify-between gap-3">
+  <div class="flex flex-col h-full">
+    <div class="flex items-center justify-between gap-3 mb-4">
       <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">Downloads</h2>
       <span
         class="inline-flex items-center gap-1.5 text-xs text-slate-400"
@@ -39,7 +39,7 @@ function next() {
       </span>
     </div>
 
-    <div class="flex gap-1.5">
+    <div class="flex gap-1.5 mb-4">
       <button
         v-for="f in filters"
         :key="f.value"
@@ -56,25 +56,28 @@ function next() {
       </button>
     </div>
 
-    <div
-      v-if="store.loading && store.jobs.length === 0"
-      class="text-sm text-slate-500 py-8 text-center"
-    >
-      Loading…
-    </div>
-    <div
-      v-else-if="store.jobs.length === 0"
-      class="flex flex-col items-center gap-2 py-12 text-slate-400 dark:text-slate-500"
-    >
-      <Inbox class="w-10 h-10" />
-      <p class="text-sm">No downloads yet</p>
+    <!-- Scrollable list area -->
+    <div class="flex-1 min-h-0 overflow-y-auto pr-1">
+      <div
+        v-if="store.loading && store.jobs.length === 0"
+        class="text-sm text-slate-500 py-8 text-center"
+      >
+        Loading…
+      </div>
+      <div
+        v-else-if="store.jobs.length === 0"
+        class="flex flex-col items-center gap-2 py-12 text-slate-400 dark:text-slate-500"
+      >
+        <Inbox class="w-10 h-10" />
+        <p class="text-sm">No downloads yet</p>
+      </div>
+
+      <div v-else class="space-y-3">
+        <JobCard v-for="job in store.jobs" :key="job.id" :job="job" />
+      </div>
     </div>
 
-    <div v-else class="space-y-3">
-      <JobCard v-for="job in store.jobs" :key="job.id" :job="job" />
-    </div>
-
-    <div v-if="totalPages > 1" class="flex items-center justify-between pt-2">
+    <div v-if="totalPages > 1" class="flex items-center justify-between pt-3 mt-1 border-t border-slate-100 dark:border-slate-800 shrink-0">
       <button
         type="button"
         class="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-sm disabled:opacity-40"

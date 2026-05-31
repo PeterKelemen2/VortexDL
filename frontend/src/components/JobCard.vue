@@ -11,6 +11,7 @@ import {
   Ban,
   Clock,
   Monitor,
+  RotateCcw,
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -73,6 +74,9 @@ const title = computed(
 )
 
 const isActive = computed(() => props.job.status === 'queued' || props.job.status === 'running')
+const canRetry = computed(
+  () => props.job.status === 'failed' || props.job.status === 'canceled',
+)
 const canDownload = computed(
   () => props.job.status === 'finished' && (props.job.result?.local_available ?? true),
 )
@@ -86,6 +90,15 @@ async function cancel() {
     toast.success('Job canceled')
   } catch (e) {
     toast.error(e.message || 'Failed to cancel job')
+  }
+}
+
+async function retry() {
+  try {
+    await store.retryJob(props.job.id)
+    toast.success('Job re-queued')
+  } catch (e) {
+    toast.error(e.message || 'Failed to retry job')
   }
 }
 
@@ -129,6 +142,15 @@ async function download() {
             >
               <Download class="w-4 h-4" />
               Download
+            </button>
+            <button
+              v-if="canRetry"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+              @click="retry"
+            >
+              <RotateCcw class="w-4 h-4" />
+              Retry
             </button>
             <button
               v-if="isActive"
