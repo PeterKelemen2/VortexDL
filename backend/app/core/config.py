@@ -16,9 +16,17 @@ class Settings:
     JWT_ISSUER = os.getenv("JWT_ISSUER", "ytdlp_client")
     JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "ytdlp_client")
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+    # Restrict to a vetted allowlist so a misconfigured environment can never
+    # select the "none" algorithm (which would disable signature verification).
+    if JWT_ALGORITHM not in {"HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "ES256", "ES384", "ES512"}:
+        raise RuntimeError(f"Unsupported JWT_ALGORITHM: {JWT_ALGORITHM!r}")
     COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax").lower()
     if COOKIE_SAMESITE not in {"lax", "strict", "none"}:
         COOKIE_SAMESITE = "lax"
+    # Whether to set the Secure flag on auth cookies. Must be enabled in any
+    # deployment served over HTTPS (including behind a TLS-terminating reverse
+    # proxy, where the upstream request scheme appears as plain http).
+    SECURE_COOKIES = os.getenv("SECURE_COOKIES", "false").lower() in ("1", "true", "yes")
     INITIAL_ADMIN_USERNAME = os.getenv("INITIAL_ADMIN_USERNAME")
     INITIAL_ADMIN_EMAIL = os.getenv("INITIAL_ADMIN_EMAIL")
     INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD")
@@ -35,6 +43,10 @@ class Settings:
     PROFILE_IMAGE_VARIANT_QUALITY = int(os.getenv("PROFILE_IMAGE_VARIANT_QUALITY", "85"))
     PROFILE_IMAGE_VARIANT_SEPARATOR = os.getenv("PROFILE_IMAGE_VARIANT_SEPARATOR", "__")
     CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if origin.strip()]
+    # A wildcard origin combined with credentialed requests (allow_credentials=True)
+    # would let any site issue authenticated cross-origin calls. Disallow it.
+    if "*" in CORS_ORIGINS:
+        raise RuntimeError("CORS_ORIGINS must not contain '*' because credentialed CORS is enabled")
 
     # Public base URL of the frontend, used to build links in outgoing emails.
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
@@ -74,6 +86,9 @@ class Settings:
     JOB_WORKER_CONCURRENCY = int(os.getenv("JOB_WORKER_CONCURRENCY", "2"))
     # Root directory where downloaded files are written (per-user subdirectories).
     DOWNLOAD_DIR = os.getenv("DOWNLOAD_DIR", "./downloads")
+    # Upper bound on the size of a single downloaded artifact, to bound disk usage
+    # and prevent a single job from exhausting storage. Default: 10 GiB.
+    DOWNLOAD_MAX_FILE_SIZE_BYTES = int(os.getenv("DOWNLOAD_MAX_FILE_SIZE_BYTES", str(10 * 1024 * 1024 * 1024)))
 
     # --- Remote (SSH/SFTP) downloads -------------------------------------------
     # Symmetric key used to encrypt stored remote-machine passwords at rest.

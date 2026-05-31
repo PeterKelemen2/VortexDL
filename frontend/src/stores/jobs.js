@@ -118,21 +118,26 @@ export const useJobsStore = defineStore('jobs', () => {
     })
     eventSource.addEventListener('error', () => {
       sseConnected.value = false
-      // EventSource auto-reconnects, but if the token expired the server will
-      // reject it (401). Rebuild the connection with a fresh token after a delay.
-      if (eventSource && eventSource.readyState === EventSource.CLOSED) {
-        disconnectSSE()
-        if (!reconnectTimer) {
-          reconnectTimer = setTimeout(() => {
-            reconnectTimer = null
-            connectSSE()
-          }, 5000)
-        }
+      // Stop the browser's built-in auto-retry: it would reuse the original URL
+      // with the stale token baked in, which fails silently once the token
+      // expires and produces "connection interrupted" console noise.
+      // Instead, we take over: close the current EventSource and schedule a
+      // fresh reconnect that picks up the current access token.
+      disconnectSSE()
+      if (!reconnectTimer) {
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null
+          connectSSE()
+        }, 5000)
       }
     })
   }
 
   function disconnectSSE() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
     if (eventSource) {
       eventSource.close()
       eventSource = null

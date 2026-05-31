@@ -42,45 +42,37 @@ async def stream_job_events(
     current_user = await get_current_user(token=token, db=db)
     queue = await sse_bus.subscribe(current_user.id)
 
-    from app.main import shutdown_event
+    from app.core.sse_bus import _CLOSE
 
     async def event_generator():
+        # How often we wake up to poll is_disconnected().  Must be short so a
+        # browser that closes the EventSource (or a uvicorn hot-reload) is
+        # detected quickly.  Keep-alive comments are sent less frequently so we
+        # don't spam the wire; we just track accumulated idle time ourselves.
+        poll_interval = 2.0
+        keepalive_every = 20.0
+        idle = 0.0
         try:
             # Prompt the client to reconnect after 5s if the connection drops.
             yield "retry: 5000\n\n"
             while True:
+                # is_disconnected() is a non-blocking poll in Starlette; check
+                # it at the top of every iteration so we exit promptly after the
+                # browser closes the connection.
                 if await request.is_disconnected():
                     break
-                if shutdown_event and shutdown_event.is_set():
-                    break
-
-                # Race the next event against disconnection / shutdown so we
-                # never block the server from reloading/stopping for long.
-                get_task = asyncio.ensure_future(queue.get())
-                shutdown_task = asyncio.ensure_future(
-                    shutdown_event.wait() if shutdown_event else asyncio.sleep(25.0)
-                )
-                done, pending = await asyncio.wait(
-                    {get_task, shutdown_task},
-                    timeout=25.0,
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-                for t in pending:
-                    t.cancel()
-
-                if shutdown_task in done or (shutdown_event and shutdown_event.is_set()):
-                    break
-                if await request.is_disconnected():
-                    break
-                if get_task in done:
-                    try:
-                        payload = get_task.result()
-                        yield f"event: job_update\ndata: {payload}\n\n"
-                    except Exception:
-                        pass
-                else:
-                    # Both timed out — send keep-alive
-                    yield ": keep-alive\n\n"
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=poll_interval)
+                    idle = 0.0
+                    # None / _CLOSE sentinel means the server is shutting down.
+                    if payload is _CLOSE:
+                        break
+                    yield f"event: job_update\ndata: {payload}\n\n"
+                except asyncio.TimeoutError:
+                    idle += poll_interval
+                    if idle >= keepalive_every:
+                        yield ": keep-alive\n\n"
+                        idle = 0.0
         finally:
             await sse_bus.unsubscribe(current_user.id, queue)
 

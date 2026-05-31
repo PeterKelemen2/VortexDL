@@ -10,11 +10,20 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.job_queue import job_queue
+from app.core.config import settings
 from app.models.job import Job, JobStatus
 from app.models.remote_machine import RemoteMachine
 from app.models.user_remote_machine import UserRemoteMachine
 from app.schemas.job import DownloadDestination, DownloadJobCreate, JobRead
 from app.services.download_service import DOWNLOAD_JOB_TYPE
+
+# Extensions that are safe to expose in a Content-Disposition filename. Anything
+# else (e.g. a tampered DB record pointing at an executable) is downgraded to
+# a neutral extension so the browser never treats it as runnable content.
+_SAFE_DOWNLOAD_EXTENSIONS = {
+    ".mp3", ".mp4", ".m4a", ".webm", ".mkv", ".opus", ".flac",
+    ".wav", ".ogg", ".aac", ".mov", ".avi", ".jpg", ".jpeg", ".png", ".webp",
+}
 
 
 def _to_read(job: Job) -> JobRead:
@@ -157,7 +166,17 @@ async def get_job_file(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="File not found"
         )
-    path = Path(filepath)
+    # Defense in depth: the stored filepath must resolve to a location inside this
+    # user's download directory. This prevents a tampered job.result record from
+    # turning the download endpoint into an arbitrary-file-read primitive.
+    download_root = (Path(settings.DOWNLOAD_DIR) / str(user_id)).resolve()
+    path = Path(filepath).resolve()
+    try:
+        path.relative_to(download_root)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="File not found"
+        )
     if not path.is_file():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="File no longer exists"
@@ -166,6 +185,8 @@ async def get_job_file(
     # never sees any _1/_2 deduplication suffix added on the backend.
     title = result.get("title", "").strip()
     ext = path.suffix  # includes the leading dot, e.g. ".mp3"
+    if ext.lower() not in _SAFE_DOWNLOAD_EXTENSIONS:
+        ext = ".bin"
     if title and ext:
         # Strip characters that are unsafe in Content-Disposition filenames.
         safe_title = "".join(c if c not in r'\/:*?"<>|' else "_" for c in title)

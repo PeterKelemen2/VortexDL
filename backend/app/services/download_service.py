@@ -47,6 +47,7 @@ def _build_ydl_opts(payload: dict, dest: Path) -> dict:
         "quiet": True,
         "no_warnings": True,
         "no_overwrites": True,
+        "max_filesize": settings.DOWNLOAD_MAX_FILE_SIZE_BYTES,
         "postprocessors": [],
     }
 
@@ -178,7 +179,12 @@ def _safe_remote_path(root: str, subfolder: str | None, filename: str) -> str:
     target_dir = posixpath.normpath(posixpath.join(root_norm, rel))
     if target_dir != root_norm and not target_dir.startswith(root_norm + "/"):
         raise ValueError("Remote subfolder escapes the configured download folder")
-    return posixpath.join(target_dir, filename)
+    # Strip any directory components from the filename so it can never redirect
+    # the upload outside the validated target directory.
+    safe_filename = posixpath.basename(filename)
+    if not safe_filename or safe_filename in {".", ".."}:
+        raise ValueError("Invalid remote filename")
+    return posixpath.join(target_dir, safe_filename)
 
 
 async def _deliver_remote(payload: dict, local_path: Path) -> dict:

@@ -64,7 +64,10 @@ CSRF_HEADER_NAME = "X-CSRF-Token"
 logger = logging.getLogger(__name__)
 
 def _cookie_settings(request: Request) -> dict:
-    secure = request.url.scheme == "https"
+    # Never trust the request scheme: behind a TLS-terminating proxy it appears as
+    # plain http, which would silently drop the Secure flag in production. The
+    # operator declares HTTPS explicitly via SECURE_COOKIES.
+    secure = settings.SECURE_COOKIES
     same_site = settings.COOKIE_SAMESITE
     return {"secure": secure, "samesite": same_site}
 

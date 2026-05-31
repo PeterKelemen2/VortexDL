@@ -18,24 +18,38 @@ from typing import Any
 logger = logging.getLogger("app.sse_bus")
 
 
+# Sentinel placed into a queue to signal the consumer to shut down.
+_CLOSE = object()
+
+
 class SSEBus:
     def __init__(self) -> None:
-        self._listeners: dict[int, set[asyncio.Queue[str]]] = {}
+        self._listeners: dict[int, set[asyncio.Queue]] = {}
         self._lock = asyncio.Lock()
 
-    async def subscribe(self, user_id: int) -> asyncio.Queue[str]:
-        queue: asyncio.Queue[str] = asyncio.Queue(maxsize=100)
+    async def subscribe(self, user_id: int) -> asyncio.Queue:
+        queue: asyncio.Queue = asyncio.Queue(maxsize=100)
         async with self._lock:
             self._listeners.setdefault(user_id, set()).add(queue)
         return queue
 
-    async def unsubscribe(self, user_id: int, queue: asyncio.Queue[str]) -> None:
+    async def unsubscribe(self, user_id: int, queue: asyncio.Queue) -> None:
         async with self._lock:
             listeners = self._listeners.get(user_id)
             if listeners is not None:
                 listeners.discard(queue)
                 if not listeners:
                     self._listeners.pop(user_id, None)
+
+    async def close_all(self) -> None:
+        """Signal every active SSE consumer to exit (called during server shutdown)."""
+        async with self._lock:
+            for user_queues in self._listeners.values():
+                for queue in user_queues:
+                    try:
+                        queue.put_nowait(_CLOSE)
+                    except asyncio.QueueFull:
+                        pass
 
     def emit(self, user_id: int, event_type: str, data: dict[str, Any]) -> None:
         """Fan out an event to all of a user's listeners (non-blocking)."""

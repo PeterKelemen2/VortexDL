@@ -19,12 +19,9 @@ logging.basicConfig(
 from app.core.rate_limit import limiter
 from app.core.job_queue import job_queue
 from app.core.ssh_pool import ssh_pool
+from app.core.sse_bus import sse_bus
 from app.services.auth_service import bootstrap_initial_admin
 from app.services.download_service import DOWNLOAD_JOB_TYPE, download_handler
-
-
-# Signalled during shutdown so long-lived streaming connections (SSE) can exit.
-shutdown_event: asyncio.Event | None = None
 
 
 @asynccontextmanager
@@ -40,8 +37,8 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        if shutdown_event:
-            shutdown_event.set()
+        # Close all SSE connections first so uvicorn doesn't hang waiting for them.
+        await sse_bus.close_all()
         await job_queue.stop()
         await ssh_pool.close_all()
 
@@ -63,6 +60,20 @@ app.add_middleware(
 	allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 	allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+	response = await call_next(request)
+	response.headers.setdefault("X-Content-Type-Options", "nosniff")
+	response.headers.setdefault("X-Frame-Options", "DENY")
+	response.headers.setdefault("Referrer-Policy", "no-referrer")
+	response.headers.setdefault("X-XSS-Protection", "0")
+	if settings.SECURE_COOKIES:
+		response.headers.setdefault(
+			"Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+		)
+	return response
 
 app.include_router(health.router)
 app.include_router(auth.router)

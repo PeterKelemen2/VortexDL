@@ -17,7 +17,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="bg-slate-50 dark:bg-slate-950 min-h-[calc(100vh-3.5rem)]">
+  <div class="bg-slate-50 dark:bg-slate-950 min-h-[calc(100vh-4rem)]">
     <div class="mx-auto max-w-6xl px-4 py-8 lg:py-10">
       <div class="mb-7">
         <h1 class="text-xl font-bold text-slate-900 dark:text-slate-100">Download</h1>
@@ -30,7 +30,7 @@ onBeforeUnmount(() => {
         <div>
           <DownloadForm />
         </div>
-        <div class="lg:sticky lg:top-8 h-[calc(100vh-14rem)]">
+        <div class="lg:sticky lg:top-8 h-[calc(100vh-15rem)]">
           <JobQueue />
         </div>
       </div>
